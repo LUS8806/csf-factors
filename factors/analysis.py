@@ -6,6 +6,7 @@ from data_type import *
 import itertools
 import numpy as np
 
+# 处理fac_ret_data 有关的函数
 
 def prepare_data(fac_names, index_code, start_date, end_date, freq):
     """
@@ -21,8 +22,10 @@ def prepare_data(fac_names, index_code, start_date, end_date, freq):
     raw_fac_names = fac_names
     if not isinstance(fac_names, list):
         fac_names = fac_names
-    fac_names.append('M004023')
+    fac_names.append('M004023') #只分析cap的情况
     raw_fac = get_raw_factor(fac_names, index_code, start_date, end_date, freq)
+
+    # raw_fac  ==> 过滤股票 ==> 标准化 ==> 打上分组标签 ==> 获取cap以及 ret ==>fac_ret_data
 
     dt_index = raw_fac.index.get_level_values(0).unique()
 

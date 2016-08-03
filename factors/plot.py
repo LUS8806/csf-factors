@@ -6,38 +6,27 @@ import numpy as np
 import scipy.stats as stats
 
 
-def _plot_ic(self, fac_name='p.p1', is_comb= False, comb_name='comb_name'):
+
+
+def plot_ic(IC_analysis):
     """
-    假设此时self.single_fac_analysis_results存在
+
+    :param IC_analysis:
+    :return:
     """
-    # TODO: check
     # ic, ic_decay, auto_correlation = None, None, None
-    if is_comb:
-        ic = self.multi_factor_analysis_results[
-            comb_name].IC_analysis.IC_series.ic
-        ic_decay = self.multi_factor_analysis_results[
-            comb_name].IC_analysis.IC_decay
-        auto_correlation = self.multi_factor_analysis_results[
-            comb_name].turnover_analysis.auto_correlation
-    else:
-        ic = self.single_factor_analysis_results[
-            fac_name].IC_analysis.IC_series.ic
-        ic_decay = self.single_factor_analysis_results[
-            fac_name].IC_analysis.IC_decay
-        auto_correlation = self.single_factor_analysis_results[
-            fac_name].turnover_analysis.auto_correlation
+    ic_series = IC_analysis.IC_series.ic
+    ic_decay = IC_analysis.IC_decay
     import matplotlib.gridspec as gridspec
     with plt.rc_context({'figure.figsize': (15, 9)}):
         gs = gridspec.GridSpec(3, 2)
         ax1 = plt.subplot(gs[0, :])
         ax2 = plt.subplot(gs[1, 0])
         ax3 = plt.subplot(gs[1, 1])
-        ax5 = plt.subplot(gs[2, 1])
 
-        plot_IC_bar_and_series(ic, window_size=5, ax=ax1)
-        plot_IC_distribution(ic, ax=ax2, bins=10)
+        plot_IC_bar_and_series(ic_series, window_size=5, ax=ax1)
+        plot_IC_distribution(ic_series, ax=ax2, bins=10)
         plot_IC_decay(ic_decay, ax=ax3)
-        auto_correlation.mean().plot.bar(ax=ax5, title='auto correlation')
 
 
 def _plot_ret(self, fac_name='p.p1',is_comb= False,comb_name='comb_name'):
