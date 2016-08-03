@@ -1,0 +1,6 @@
+*.iws
+*.xml
+*.iml
+*.name
+.ipynb_checkpoints
+.idea
