@@ -10,7 +10,7 @@ import scipy.stats as stats
 
 def plot_ic(IC_analysis):
     """
-
+    IC分析作图
     :param IC_analysis:
     :return:
     """
@@ -29,41 +29,37 @@ def plot_ic(IC_analysis):
         plot_IC_decay(ic_decay, ax=ax3)
 
 
-def _plot_ret(self, fac_name='p.p1',is_comb= False,comb_name='comb_name'):
-    if is_comb:
-        ret = self.multi_factor_analysis_results[comb_name].return_analysis.group_return_cumulative.T.copy()
-    else:
-        ret = self.single_factor_analysis_results[
-            fac_name].return_analysis.group_return_cumulative.T.copy()
-    ret.loc[:, 'benchmark'] = self.all_data['benchmark_term_return']
+def plot_ret(Return_analysis):
+    """
+    收益率分析作图
+    :param Return_analysis:  TODO 加入Benchmark Return
+    :return:
+    """
+    ret = Return_analysis.group_cum_return.T.copy()
     ret.plot()
 
     fig2 = plt.figure()
     ax2 = fig2.add_subplot(121)
-    # TODO: javascript
     returns = ret.Q1
     plot_returns_distribution(returns, ax2, bins=10)
-
     ax3 = fig2.add_subplot(122)
     ret.plot(ax=ax3, rot=90)
 
 
-def _plot_code_result(self, fac_name='p.p1', Q='Q1',is_comb= False,comb_name='comb_name'):
+def plot_code_result(Code_analysis):
+    """
+    选股结果分析作图
+    :param Code_analysis:
+    :return:
+    """
     origin_figsize = plt.rcParams['figure.figsize']
     # cap
     plt.rcParams['figure.figsize'] = (12, 4)
     plt.style.use('ggplot')
-    if is_comb:
-        df=self.multi_factor_analysis_results[comb_name].code_analysis.cap_analysis.copy()
-        industry_q = self.multi_factor_analysis_results[
-                         comb_name].code_analysis.industry_analysis.gp_industry_percent.loc[
-                     :, Q].copy()
-        gp_industry_percent = self.multi_factor_analysis_results[comb_name].code_analysis.industry_analysis.gp_mean_per.copy()
-    else:
-        df = self.single_factor_analysis_results[fac_name].code_analysis.cap_analysis.copy()
-        industry_q = self.single_factor_analysis_results[
-             fac_name].code_analysis.industry_analysis.gp_industry_percent.loc[:, Q].copy()
-        gp_industry_percent = self.single_factor_analysis_results[fac_name].code_analysis.industry_analysis.gp_mean_per.copy()
+    df = Code_analysis.cap_analysis.copy()
+    industry_q = Code_analysis.industry_analysis.gp_industry_percent.loc[:, Q].copy()
+    gp_industry_percent = Code_analysis.industry_analysis.gp_mean_per.copy()
+
     mean_cap = df.loc[:, 'group_cap_mean']
     df = df.drop(['group_cap_mean'], axis=1)
     df = df.T.loc[:, Q]
