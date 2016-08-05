@@ -6,75 +6,60 @@ import numpy as np
 import scipy.stats as stats
 
 
-def _plot_ic(self, fac_name='p.p1', is_comb= False, comb_name='comb_name'):
+
+
+def plot_ic(IC_analysis):
     """
-    假设此时self.single_fac_analysis_results存在
+    IC分析作图
+    :param IC_analysis:
+    :return:
     """
-    # TODO: check
     # ic, ic_decay, auto_correlation = None, None, None
-    if is_comb:
-        ic = self.multi_factor_analysis_results[
-            comb_name].IC_analysis.IC_series.ic
-        ic_decay = self.multi_factor_analysis_results[
-            comb_name].IC_analysis.IC_decay
-        auto_correlation = self.multi_factor_analysis_results[
-            comb_name].turnover_analysis.auto_correlation
-    else:
-        ic = self.single_factor_analysis_results[
-            fac_name].IC_analysis.IC_series.ic
-        ic_decay = self.single_factor_analysis_results[
-            fac_name].IC_analysis.IC_decay
-        auto_correlation = self.single_factor_analysis_results[
-            fac_name].turnover_analysis.auto_correlation
+    ic_series = IC_analysis.IC_series.ic
+    ic_decay = IC_analysis.IC_decay
     import matplotlib.gridspec as gridspec
     with plt.rc_context({'figure.figsize': (15, 9)}):
         gs = gridspec.GridSpec(3, 2)
         ax1 = plt.subplot(gs[0, :])
         ax2 = plt.subplot(gs[1, 0])
         ax3 = plt.subplot(gs[1, 1])
-        ax5 = plt.subplot(gs[2, 1])
 
-        plot_IC_bar_and_series(ic, window_size=5, ax=ax1)
-        plot_IC_distribution(ic, ax=ax2, bins=10)
+        plot_IC_bar_and_series(ic_series, window_size=5, ax=ax1)
+        plot_IC_distribution(ic_series, ax=ax2, bins=10)
         plot_IC_decay(ic_decay, ax=ax3)
-        auto_correlation.mean().plot.bar(ax=ax5, title='auto correlation')
 
 
-def _plot_ret(self, fac_name='p.p1',is_comb= False,comb_name='comb_name'):
-    if is_comb:
-        ret = self.multi_factor_analysis_results[comb_name].return_analysis.group_return_cumulative.T.copy()
-    else:
-        ret = self.single_factor_analysis_results[
-            fac_name].return_analysis.group_return_cumulative.T.copy()
-    ret.loc[:, 'benchmark'] = self.all_data['benchmark_term_return']
+def plot_ret(Return_analysis):
+    """
+    收益率分析作图
+    :param Return_analysis:  TODO 加入Benchmark Return
+    :return:
+    """
+    ret = Return_analysis.group_cum_return.T.copy()
     ret.plot()
 
     fig2 = plt.figure()
     ax2 = fig2.add_subplot(121)
-    # TODO: javascript
     returns = ret.Q1
     plot_returns_distribution(returns, ax2, bins=10)
-
     ax3 = fig2.add_subplot(122)
     ret.plot(ax=ax3, rot=90)
 
 
-def _plot_code_result(self, fac_name='p.p1', Q='Q1',is_comb= False,comb_name='comb_name'):
+def plot_code_result(Code_analysis):
+    """
+    选股结果分析作图
+    :param Code_analysis:
+    :return:
+    """
     origin_figsize = plt.rcParams['figure.figsize']
     # cap
     plt.rcParams['figure.figsize'] = (12, 4)
     plt.style.use('ggplot')
-    if is_comb:
-        df=self.multi_factor_analysis_results[comb_name].code_analysis.cap_analysis.copy()
-        industry_q = self.multi_factor_analysis_results[
-                         comb_name].code_analysis.industry_analysis.gp_industry_percent.loc[
-                     :, Q].copy()
-        gp_industry_percent = self.multi_factor_analysis_results[comb_name].code_analysis.industry_analysis.gp_mean_per.copy()
-    else:
-        df = self.single_factor_analysis_results[fac_name].code_analysis.cap_analysis.copy()
-        industry_q = self.single_factor_analysis_results[
-             fac_name].code_analysis.industry_analysis.gp_industry_percent.loc[:, Q].copy()
-        gp_industry_percent = self.single_factor_analysis_results[fac_name].code_analysis.industry_analysis.gp_mean_per.copy()
+    df = Code_analysis.cap_analysis.copy()
+    industry_q = Code_analysis.industry_analysis.gp_industry_percent.loc[:, Q].copy()
+    gp_industry_percent = Code_analysis.industry_analysis.gp_mean_per.copy()
+
     mean_cap = df.loc[:, 'group_cap_mean']
     df = df.drop(['group_cap_mean'], axis=1)
     df = df.T.loc[:, Q]
