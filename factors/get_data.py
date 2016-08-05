@@ -129,3 +129,20 @@ def get_stock_lst_date(codes):
     for code in codes:
         df['code'] = csf.get_stock_ipo_info(code, field=field).dt[0]
     return df
+
+
+
+
+def get_csf_index_factor_data():
+    """
+    获取数库行业指数因子数据
+    :return:
+    """
+
+    pass
+
+
+
+
+
+

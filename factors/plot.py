@@ -6,8 +6,6 @@ import numpy as np
 import scipy.stats as stats
 
 
-
-
 def plot_ic(IC_analysis):
     """
     IC分析作图
@@ -86,28 +84,22 @@ def plot_code_result(Code_analysis):
     plt.rcParams['figure.figsize'] = origin_figsize
 
 
-def _plot_turnover(self, fac_name='p.p1',is_comb= False,comb_name='comb_name'):
-    if is_comb:
-        buy_signal = self.multi_factor_analysis_results[
-            comb_name].turnover_analysis.buy_signal
-        turnover = self.multi_factor_analysis_results[
-            comb_name].turnover_analysis.turnover
-    else:
-        buy_signal = self.single_factor_analysis_results[
-            fac_name].turnover_analysis.buy_signal
-        turnover = self.single_factor_analysis_results[
-            fac_name].turnover_analysis.turnover
+def plot_turnover(Turnover_analysis):
+    """
+    换手率作图
+    :param Turnover_analysis:
+    :return:
+    """
+    buy_signal = Turnover_analysis.buy_signal
+    turnover = Turnover_analysis.turnover
+
     plt.style.use('ggplot')
-    # turnover
     orignal_figsize = plt.rcParams['figure.figsize']
     plt.rcParams['figure.figsize'] = (14, 4)
     fig1 = plt.figure()
     ax1 = fig1.add_subplot(111)
     turnover.plot(ax=ax1, title='turnover')
 
-    # average turnover & turnover compare
-
-    # signal decay & signal reverse
     fig_signal = plt.figure()
     ax_decay = fig_signal.add_subplot(121)
     buy_signal.decay.plot(ax=ax_decay, title='singal decay')
@@ -117,6 +109,11 @@ def _plot_turnover(self, fac_name='p.p1',is_comb= False,comb_name='comb_name'):
 
 
 def _plot_IC_bar(IC, ax=None):
+    """
+    :param IC:
+    :param ax:
+    :return:
+    """
     if ax is None:
         ax = plt.gca()
     IC.plot(kind='bar', ax=ax)

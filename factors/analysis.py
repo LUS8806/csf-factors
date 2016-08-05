@@ -194,6 +194,29 @@ def turnover_analysis(fac_ret_data, plot=False):
     :return:
     """
     ret = TurnOverAnalysis()
+    code_and_cap = fac_ret_data.groupby(level=0).apply(lambda frame: frame.groupby('group'))
+
+    def __count_turnover(current_df, next_df):
+        current_codes = set(current_df.secu)
+        next_codes = set(next_df.secu)
+        if len(current_codes) != 0:
+            ret = len((next_codes - current_codes)) / len(current_codes)
+        elif len(next_codes) != 0:
+            ret = 0.0
+        else:
+            ret = np.nan
+        return ret
+
+
+    def __capwt_turnover(current_df, next_df):
+        current_weights = current_df.cap / current_df.cap.sum()
+        next_weights = next_df.cap / next_df.cap.sum()
+
+        cur, nxt = current_weights.align(next_weights, join='outer', fill_value=0)
+        ret = (cur - nxt).abs().sum() / 2
+        return ret
+
+
     return ret
 
 
