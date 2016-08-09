@@ -5,7 +5,6 @@ import itertools
 import numpy as np
 from joblib import Parallel, delayed
 from six import string_types
-
 from .data_type import *
 from .get_data import *
 from .metrics import return_perf_metrics, information_coefficient
@@ -82,8 +81,10 @@ def add_group(fac_ret, num_group=5):
     """
     添加一个分组列
     Args:
-        num_group (int): 组数
         fac_ret (DataFrame): 一个Multi-index数据框, 含有因子,市值, 下期收益率数据
+        num_group (int): 组数
+    Returns:
+        DataFrame, 比fac_ret 多了一列, 列名是group
     """
 
     def __add_group(frame):
@@ -108,16 +109,27 @@ def raw_data_plotting():
     pass
 
 
-def return_analysis(fac_ret_data, bench_returns, fac_name=None, plot=False):
+def return_analysis(fac_ret_data, bench_returns):
     """
     收益率分析
     Args:
-    :fac_ret_data (DataFrame): 含有因子,市值,收益率,分组的数据框.且分组的列名称为'group'
-    :param bench_returns:
-    :param fac_name:
-    :param plot:
-    :return:
+        fac_ret_data (DataFrame): 含有因子,市值,收益率,分组的数据框.且分组的列名称为'group'
+        bench_returns (Series): benchmark的收益率
+    Returns:
+        ReturnAnalysis
+    Raises:
+        ValueError, 当bench_returns index 不能包含(覆盖)fac_ret_returns
     """
+
+    fac_index_start = fac_ret_data.index.get_level_values(0)[0]
+    fac_index_end = fac_ret_data.index.get_level_values(0)[-1]
+
+    bench_index_start = bench_returns.index[0]
+    bench_index_end = bench_returns.index[-1]
+
+    if bench_index_start > fac_index_start or bench_index_end < fac_index_end:
+        raise ValueError('bench_return index should contains fac_ret_data index')
+
     group_mean = fac_ret_data.groupby([fac_ret_data.index.get_level_values(0), fac_ret_data['group']])[['ret']].mean()
     group_mean = group_mean.to_panel()['ret']
     group_mean['Q_LS'] = group_mean.ix[:, 0] - group_mean.ix[:, -1]
@@ -132,25 +144,35 @@ def return_analysis(fac_ret_data, bench_returns, fac_name=None, plot=False):
     return ret
 
 
-def information_coefficient_analysis(fac_ret_data, plot=False, ic_method='normal'):
+def information_coefficient_analysis(fac_ret_data, ic_method='normal'):
     """
     信息系数（IC）分析
-    :param fac_ret_data:
-    :param plot:
-    :param ic_method
-    :return:
-    """
-    ic_series = fac_ret_data.groupby(level=0).apply(
-            lambda frame: information_coefficient(frame['factor'], frame['ret'], ic_method))
 
+    Args:
+        fac_ret_data (DataFrame): 含有因子,市值,收益率,分组的数据框.且分组的列名称为'group'
+        ic_method (str): ic计算方法, 有normal, rank, rank_adj
+    Returns:
+        ICAnalysis
+    """
+    factor_name = set(fac_ret_data.columns) - set(['M004023', 'ret', 'group'])
+    assert len(factor_name) == 1, "there should be only one factor, got {}".format(factor_name)
+    factor_name = factor_name.pop()
+    ic_series = fac_ret_data.groupby(level=0).apply(
+            lambda frame: information_coefficient(frame[factor_name], frame['ret'], ic_method))
+    ic = ic_series.map(lambda e: e[0])
+    p_value = ic_series.map(lambda e: e[1])
+    ic_series = pd.DataFrame({'ic': ic, 'p_value': p_value})
     ic_decay = IC_decay(fac_ret_data)
 
     group_ic = fac_ret_data.groupby(level=0).apply(lambda frame: frame.groupby('group').apply(
-            lambda df: information_coefficient(df['factor'], df['ret'], ic_method)))
+            lambda df: information_coefficient(df[factor_name], df['ret'], ic_method)))
+    group_ic_ic = group_ic.applymap(lambda e: e[0])
+    group_ic_p_value = group_ic.applymap(lambda e: e[1])
+    group_ic = pd.Panel({'ic': group_ic_ic, 'p_value': group_ic_p_value})
 
-    ic_statistics = pd.Series({'IC_mean' : ic_series.ic.mean(), 'p_mean': ic_series.p_value.mean(),
-                               'IC_Stdev': ic_series.ic.std(),
-                               'IC_IR'   : ic_series.ic.mean() / ic_series.ic.std()})
+    ic_statistics = pd.Series({'IC_mean' : ic.mean(), 'p_mean': p_value.mean(),
+                               'IC_Stdev': ic.std(),
+                               'IC_IR'   : ic.mean() / ic.std()})
 
     ret = ICAnalysis()
     ret.IC_series = ic_series
@@ -162,19 +184,22 @@ def information_coefficient_analysis(fac_ret_data, plot=False, ic_method='normal
 
 def IC_decay(fac_ret_cap):
     """
-    信息系数衰减
-    :param fac_ret_cap:
+    信息系数衰减, 不分组
+    Args:
+        fac_ret_cap (DataFrame): 一个Multiindex数据框
     :return:
     """
-    grouped = fac_ret_cap.groupby(level=0).apply(lambda frame: frame.groupby('group'))
+    grouped = fac_ret_cap.groupby(level=0)
     n = len(grouped)
     lag = min(n, 12)
+
+    factor_name = (set(fac_ret_cap.columns) - {'M004023', 'ret', 'group'}).pop()
 
     rets = []
     dts = [dt for dt, _ in grouped]
     frames = (frame.reset_index(level=0, drop=True) for _, frame in grouped)
     for piece_data in window(frames, lag, longest=True):
-        ret = [information_coefficient(df_fac.loc[:, 'factor'], df_ret.loc[:, 'ret'])[0]
+        ret = [information_coefficient(df_fac.loc[:, factor_name], df_ret.loc[:, 'ret'])[0]
                if df_ret is not None else np.nan
                for df_fac, df_ret in zip([piece_data[0]] * lag, piece_data)]
         rets.append(ret)
@@ -186,38 +211,55 @@ def IC_decay(fac_ret_cap):
     return decay
 
 
-def turnover_analysis(fac_ret_data, plot=False):
+def turnover_analysis(fac_ret_data, turnover_method='count'):
     """
     换手率分析
-    :param fac_ret_data:
-    :param plot:
-    :return:
+    Args:
+        fac_ret_data (DataFrame): 一个Multi index 数据框, 含有factor, ret, cap, group列
+        turnover_method (str): count or cap_weighted
+    Returns:
+        TurnoverAnalysis
     """
     ret = TurnOverAnalysis()
-    code_and_cap = fac_ret_data.groupby(level=0).apply(lambda frame: frame.groupby('group'))
 
-    def __count_turnover(current_df, next_df):
-        current_codes = set(current_df.secu)
-        next_codes = set(next_df.secu)
-        if len(current_codes) != 0:
-            ret = len((next_codes - current_codes)) / len(current_codes)
-        elif len(next_codes) != 0:
-            ret = 0.0
-        else:
-            ret = np.nan
+    # code_and_cap: index:dts, columns:groups, elements:dict, keys-->tick, values-->cap
+    code_and_cap = (fac_ret_data.groupby([fac_ret_data.index.get_level_values(0), fac_ret_data.group])
+                    .apply(lambda frame: dict(zip(frame.index.get_level_values(1), frame['M004023'])))
+                    .unstack()
+                    )
+
+    def __count_turnover(current_dict, next_dict):
+        current_codes = set(current_dict.keys())
+        next_codes = set(next_dict.keys())
+        try:
+            ret = len(next_codes - current_codes) * 1.0 / len(current_codes)
+        except ZeroDivisionError:
+            ret = np.inf
         return ret
 
-
-    def __capwt_turnover(current_df, next_df):
+    def __capwt_turnover(current_dict, next_dict):
+        current_df = pd.Series(current_dict, name='cap').to_frame()
         current_weights = current_df.cap / current_df.cap.sum()
+        next_df = pd.Series(next_dict, name='cap').to_frame()
         next_weights = next_df.cap / next_df.cap.sum()
 
         cur, nxt = current_weights.align(next_weights, join='outer', fill_value=0)
         ret = (cur - nxt).abs().sum() / 2
         return ret
 
+    method = __count_turnover if turnover_method == 'count' else __capwt_turnover
 
-    return ret
+    dts = fac_ret_data.index.get_level_values(0).unique()[:-1]
+    results = {}
+    for group in code_and_cap.columns:
+        group_ret = []
+        for idx, dic in enumerate(code_and_cap.ix[:-1, group]):
+            current_dic = dic
+            next_dic = code_and_cap.ix[idx+1, group]
+            group_ret.append(method(current_dic, next_dic))
+        results[group] = group_ret
+
+    return pd.DataFrame(results, index=dts)
 
 
 def code_analysis(fac_ret_data, plot=False):
