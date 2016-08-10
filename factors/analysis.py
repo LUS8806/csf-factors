@@ -11,6 +11,7 @@ from six import string_types
 from data_type import *
 from get_data import *
 from metrics import return_perf_metrics, information_coefficient
+from util import extreme_process
 
 
 def prepare_data(factor_name, index_code, start_date, end_date, freq):
@@ -106,6 +107,45 @@ def add_group(fac_ret, num_group=5):
         return fac_ret
     else:
         return fac_ret.groupby(level=0).apply(__add_group)
+
+
+def de_extreme(fac_ret_data, num=1, method='mad'):
+    return fac_ret_data.groupby(level=0).apply(extreme_process, num=num, method=method)
+
+
+def filter_out_st(fac_ret):
+    """
+    过滤出ST股票
+    Args:
+        fac_ret (DataFrame): 一个multi-index 数据框, level0=date, level1=code.
+        基本思想是和ST股票聚合, status==null说明不是ST的
+    Returns:
+        DataFrame, 不包含停牌股票的fac_ret
+    """
+    dts = sorted(fac_ret.index.get_level_values(0).unique())
+    st_stocks = Parallel(n_jobs=20, backend='threading', verbose=5)(delayed(csf.get_st_stock_today)(dt)
+                                                                    for dt in dts)
+    st_stocks = pd.concat(st_stocks, ignore_index=True)
+    st_stocks.loc[:, 'code'] = st_stocks.code.str.slice(0, 6)
+    st_stocks = st_stocks.set_index(['date', 'code']).sort_index()
+    joined = fac_ret.join(st_stocks, how='left')
+    result = joined[joined.status.isnull()][fac_ret.columns]
+    return result
+
+
+def filter_out_suspend(fac_ret):
+    dts = sorted(fac_ret.index.get_level_values(0).unique())
+    st_stocks = Parallel(n_jobs=20, backend='threading', verbose=5)(delayed(csf.get_st_stock_today)(date=dt)
+                                                                    for dt in dts)
+    for (dt, frame) in zip(dts, st_stocks):
+        frame.loc[:, 'date'] = dt
+
+    st_stocks = pd.concat(st_stocks, ignore_index=True)
+    st_stocks = st_stocks.query('status == "T"')
+    st_stocks = st_stocks.set_index(['date', 'code']).sort_index()
+    joined = fac_ret.join(st_stocks, how='left')
+    result = joined[joined.status.isnull()][fac_ret.columns]
+    return result
 
 
 def raw_data_plotting():
