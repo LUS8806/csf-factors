@@ -64,23 +64,18 @@ def extreme_process(data, num=3, method='mad'):
         去极值后的数据
     """
     if isinstance(data, pd.Series):
-        data = data.to_frame()
-    mu = data.mean()
-    ind = mean_abs_deviation(data) if method == 'mad' else data.std()
-
+        data_ = data.to_frame()
+    data_ = data.copy()
+    factor_name = set(data.columns) - {'M004023', 'group', 'ret'}
+    assert len(factor_name) == 1, 'there should be only one factor, got {} for {}'.format(len(factor_name), factor_name)
+    factor_name = factor_name.pop()
+    mu = data[factor_name].mean()
+    ind = mean_abs_deviation(data[factor_name]) if method == 'mad' else data[factor_name].std()
     try:
-        ret = data.clip(lower=mu - num * ind, upper=mu + num * ind, axis=1)
+        data_.loc[:, factor_name] = data_[factor_name].clip(lower=mu - num * ind, upper=mu + num * ind)
     except Exception, e:
-        lst = []
-        for col in data.columns:
-            if data.loc[:, col].isnull().all():
-                lst.append(data.loc[:, col])
-            else:
-                mu = data.loc[:, col].mean()
-                ind = mean_abs_deviation(data.loc[:, col]) if method == 'mad' else data.loc[:, col].std()
-                lst.append(data.loc[:, col].clip(lower=mu - num * ind, upper=mu + num * ind))
-        ret = pd.concat(lst, axis=1)
-    return ret
+        print(e.message)
+    return data_
 
 
 def data_scale(data, cap=None, method='normal'):
