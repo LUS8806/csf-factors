@@ -149,6 +149,25 @@ def filter_out_suspend(fac_ret):
     return result
 
 
+def filter_out_recently_ipo(fac_ret, days=20):
+    stocks = sorted(fac_ret.index.get_level_values(1).unique())
+    ipo_info = Parallel(n_jobs=20, backend='threading', verbose=5)(
+        delayed(csf.get_stock_ipo_info)(stock, field=['code', 'dt'])
+        for stock in stocks)
+    ipo_info = pd.concat(ipo_info, ignore_index=True)
+    ipo_info.loc[:, 'code'] = ipo_info.code.str.slice(0, 6)
+    ipo_info = ipo_info.rename(columns={'dt': 'listing_date'})
+    fac_ret_ = fac_ret.reset_index()
+    merged = pd.merge(fac_ret_, ipo_info, on='code')
+
+    merged.loc[:, 'days'] = (merged.date.map(pd.Timestamp) - merged.listing_date.map(pd.Timestamp)).dt.days
+
+    result = (merged.query('days>{}'.format(days))
+                    .set_index(['date', 'code'])
+                    .sort_index()[fac_ret.columns])
+
+    return result
+
 def raw_data_plotting():
     pass
 
