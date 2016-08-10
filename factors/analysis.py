@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 
 import itertools
+from collections import Counter
 
 import numpy as np
 from joblib import Parallel, delayed
+from scipy.stats import pearsonr
 from six import string_types
-from .data_type import *
-from .get_data import *
-from .metrics import return_perf_metrics, information_coefficient
+
+from data_type import *
+from get_data import *
+from metrics import return_perf_metrics, information_coefficient
 
 
 def prepare_data(factor_name, index_code, start_date, end_date, freq):
@@ -34,11 +37,11 @@ def prepare_data(factor_name, index_code, start_date, end_date, freq):
     stocks = sorted([str(c) for c in raw_fac.index.get_level_values(1).unique()])
 
     close_price = Parallel(n_jobs=10, backend='threading', verbose=5)(
-            delayed(csf.get_stock_hist_bar)(code, freq,
-                                            start_date=s,
-                                            end_date=e,
-                                            field=['date', 'close'])
-            for code in stocks)
+        delayed(csf.get_stock_hist_bar)(code, freq,
+                                        start_date=s,
+                                        end_date=e,
+                                        field=['date', 'close'])
+        for code in stocks)
     for s, p in zip(stocks, close_price):
         p['tick'] = s
     close_price = pd.concat(close_price)
@@ -158,21 +161,21 @@ def information_coefficient_analysis(fac_ret_data, ic_method='normal'):
     assert len(factor_name) == 1, "there should be only one factor, got {}".format(factor_name)
     factor_name = factor_name.pop()
     ic_series = fac_ret_data.groupby(level=0).apply(
-            lambda frame: information_coefficient(frame[factor_name], frame['ret'], ic_method))
+        lambda frame: information_coefficient(frame[factor_name], frame['ret'], ic_method))
     ic = ic_series.map(lambda e: e[0])
     p_value = ic_series.map(lambda e: e[1])
     ic_series = pd.DataFrame({'ic': ic, 'p_value': p_value})
     ic_decay = IC_decay(fac_ret_data)
 
     group_ic = fac_ret_data.groupby(level=0).apply(lambda frame: frame.groupby('group').apply(
-            lambda df: information_coefficient(df[factor_name], df['ret'], ic_method)))
+        lambda df: information_coefficient(df[factor_name], df['ret'], ic_method)))
     group_ic_ic = group_ic.applymap(lambda e: e[0])
     group_ic_p_value = group_ic.applymap(lambda e: e[1])
     group_ic = pd.Panel({'ic': group_ic_ic, 'p_value': group_ic_p_value})
 
-    ic_statistics = pd.Series({'IC_mean' : ic.mean(), 'p_mean': p_value.mean(),
+    ic_statistics = pd.Series({'IC_mean': ic.mean(), 'p_mean': p_value.mean(),
                                'IC_Stdev': ic.std(),
-                               'IC_IR'   : ic.mean() / ic.std()})
+                               'IC_IR': ic.mean() / ic.std()})
 
     ret = ICAnalysis()
     ret.IC_series = ic_series
@@ -247,6 +250,33 @@ def turnover_analysis(fac_ret_data, turnover_method='count'):
         ret = (cur - nxt).abs().sum() / 2
         return ret
 
+    def auto_correlation(fac_ret_data_):
+
+        factor_name = set(fac_ret_data_.columns) - set(['M004023', 'ret', 'group'])
+        assert len(factor_name) == 1, "there should be only one factor, got {}".format(factor_name)
+        factor_name = factor_name.pop()
+
+        grouped = fac_ret_data_.groupby(level=0)
+        n = len(grouped)
+        lag = min(n, 12)
+        dts = sorted(fac_ret_data.index.get_level_values(0).unique())
+        group_names = sorted(grouped.groups.keys())
+        table = []
+        for idx in range(0, n - lag):
+            rows = []
+            for l in range(idx + 1, idx + 1 + lag):
+                current_frame = (grouped.get_group(group_names[idx])
+                                 .reset_index()
+                                 .set_index('code')[factor_name].dropna())
+                next_frame = (grouped.get_group(group_names[l])
+                              .reset_index()
+                              .set_index('code')[factor_name].dropna())
+                x, y = current_frame.align(next_frame, join='inner')
+                rows.append(pearsonr(x.values, y.values)[0])
+            table.append(rows)
+        auto_corr_ = pd.DataFrame(table, index=dts[:(n - lag)], columns=list(range(1, lag + 1)))
+        return auto_corr_
+
     method = __count_turnover if turnover_method == 'count' else __capwt_turnover
 
     dts = fac_ret_data.index.get_level_values(0).unique()[:-1]
@@ -255,21 +285,70 @@ def turnover_analysis(fac_ret_data, turnover_method='count'):
         group_ret = []
         for idx, dic in enumerate(code_and_cap.ix[:-1, group]):
             current_dic = dic
-            next_dic = code_and_cap.ix[idx+1, group]
+            next_dic = code_and_cap.ix[idx + 1, group]
             group_ret.append(method(current_dic, next_dic))
         results[group] = group_ret
 
-    return pd.DataFrame(results, index=dts)
+    turnov = pd.DataFrame(results, index=dts)
+
+    auto_corr = auto_correlation(fac_ret_data)
+    ret.auto_correlation = auto_corr
+    ret.turnover = turnov
+    return ret
 
 
 def code_analysis(fac_ret_data, plot=False):
     """
     选股结果分析
-    :param fac_ret_data:
-    :param plot:
-    :return:
+    fac_ret_data:
+    plot:
+
+    Args:
+        fac_ret_data (DataFrame):  一个Multi index 数据框, 含有factor, ret, cap, group列
     """
     ret = CodeAnalysis()
+
+    grouped = fac_ret_data.groupby([fac_ret_data.index.get_level_values(0), fac_ret_data.group])
+
+    # index:dt, columns:group
+    stocks_per_dt_group = grouped.apply(lambda frame_: tuple(frame_.index.get_level_values(1))).unstack()
+
+    mean_cap_per_dt_group = grouped.apply(lambda frame_: frame_['M004023'].mean()).unstack()  # index:dt, columns:group
+
+    mean_cap_per_group = mean_cap_per_dt_group.mean()
+
+    stocks = sorted(fac_ret_data.index.get_level_values(1).unique())
+
+    industries = [csf.get_stock_csf_industry(codes, field=['code', 'level2_name']) for codes in batch(stocks, n=90)]
+
+    industries = pd.concat(industries)
+    industries.loc[:, 'code'] = industries.code.str.slice(0, 6)
+    industries_dict = dict(zip(industries.code, industries.level2_name))
+
+    # code ---> industry
+    industries_per_dt_group = stocks_per_dt_group.applymap(lambda tup: tuple(industries_dict[t] for t in tup))
+
+    # industry tuple ---> Counter
+    counter = industries_per_dt_group.applymap(lambda tup: Counter(tup))
+
+    # counter ----> percent
+    counter_percent = counter.applymap(lambda dic: {k: v * 1.0 / sum(dic.values()) for k, v in dic.iteritems()})
+
+    dic_frame = {}
+    for col in counter_percent.columns:
+        frame = pd.DataFrame(counter_percent[col].tolist(), index=counter_percent.index).fillna(0)
+        frame = frame[list(frame.iloc[0, :].sort_values(ascending=False).index)]
+        dic_frame[col] = frame
+
+    # 行业平均占比: 所有分组, 所有dt合并到一起
+    industries_total = Counter(industries_per_dt_group.sum().sum())
+    industries_total = {str(k): v for k, v in industries_total.iteritems()}
+    industries_total = pd.Series(industries_total).sort_values(ascending=False)
+
+    ret.cap_analysis = mean_cap_per_dt_group
+    ret.industry_analysis = IndustryAnalysis(gp_mean_per=industries_total, gp_industry_percent=dic_frame)
+    ret.stock_list = stocks_per_dt_group
+
     return ret
 
 
@@ -292,3 +371,9 @@ def window(seq, n=2, longest=False):
     for elem in it:
         result = result[1:] + (elem,)
         yield result
+
+
+def batch(iterable, n=1):
+    l = len(iterable)
+    for ndx in range(0, l, n):
+        yield iterable[ndx:min(ndx + n, l)]
