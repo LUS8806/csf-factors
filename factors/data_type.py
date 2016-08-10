@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
 class FactorData(object):
-    def __init__(self, name, return_analysis, information_coefficient_analysis, turnover_analysis, code_analysis):
+    def __init__(self, name, return_analysis=None,
+                 information_coefficient_analysis=None, turnover_analysis=None, code_analysis=None):
         self.name = name
         self.return_analysis = return_analysis
         self.IC_analysis = information_coefficient_analysis
