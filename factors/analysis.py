@@ -81,12 +81,13 @@ def prepare_data(factor_name, index_code, start_date, end_date, freq):
     return fac_ret
 
 
-def add_group(fac_ret, num_group=5):
+def add_group(fac_ret, num_group=5, ascending=True):
     """
     添加一个分组列
     Args:
         fac_ret (DataFrame): 一个Multi-index数据框, 含有因子,市值, 下期收益率数据
         num_group (int): 组数
+        ascending (bool): 是否升序排列
     Returns:
         DataFrame, 比fac_ret 多了一列, 列名是group
     """
@@ -96,7 +97,7 @@ def add_group(fac_ret, num_group=5):
         keep_columns = ['M004023', 'ret']
         factor_name = list(set(frame.columns) - set(keep_columns))
         factor_name = factor_name[0]
-        rnk = frame.loc[:, factor_name].rank(method='first', na_option='bottom')
+        rnk = frame.loc[:, factor_name].rank(method='first', na_option='bottom', ascending=ascending)
         labels = ['Q{:0>2}'.format(i) for i in range(1, num_group + 1)]
         category = pd.cut(rnk, bins=num_group, labels=labels).astype(str)
         category.name = 'group'
