@@ -136,15 +136,15 @@ def filter_out_st(fac_ret):
 
 def filter_out_suspend(fac_ret):
     dts = sorted(fac_ret.index.get_level_values(0).unique())
-    st_stocks = Parallel(n_jobs=20, backend='threading', verbose=5)(delayed(csf.get_st_stock_today)(date=dt)
-                                                                    for dt in dts)
-    for (dt, frame) in zip(dts, st_stocks):
+    suspend_stocks = Parallel(n_jobs=20, backend='threading', verbose=5)(delayed(csf.get_stock_sus_today)(date=dt)
+                                                                         for dt in dts)
+    for (dt, frame) in zip(dts, suspend_stocks):
         frame.loc[:, 'date'] = dt
 
-    st_stocks = pd.concat(st_stocks, ignore_index=True)
-    st_stocks = st_stocks.query('status == "T"')
-    st_stocks = st_stocks.set_index(['date', 'code']).sort_index()
-    joined = fac_ret.join(st_stocks, how='left')
+    suspend_stocks = pd.concat(suspend_stocks, ignore_index=True)
+    suspend_stocks = suspend_stocks.query('status == "T"')
+    suspend_stocks = suspend_stocks.set_index(['date', 'code']).sort_index()
+    joined = fac_ret.join(suspend_stocks, how='left')
     result = joined[joined.status.isnull()][fac_ret.columns]
     return result
 
@@ -163,10 +163,11 @@ def filter_out_recently_ipo(fac_ret, days=20):
     merged.loc[:, 'days'] = (merged.date.map(pd.Timestamp) - merged.listing_date.map(pd.Timestamp)).dt.days
 
     result = (merged.query('days>{}'.format(days))
-                    .set_index(['date', 'code'])
-                    .sort_index()[fac_ret.columns])
+              .set_index(['date', 'code'])
+              .sort_index()[fac_ret.columns])
 
     return result
+
 
 def raw_data_plotting():
     pass
