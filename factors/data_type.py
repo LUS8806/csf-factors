@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 
 class FactorData(object):
-    def __init__(self, name, return_analysis, IC_analysis, turnover_analysis,
-                 code_analysis):
+    def __init__(self, name, return_analysis, information_coefficient_analysis, turnover_analysis, code_analysis):
         self.name = name
         self.return_analysis = return_analysis
-        self.IC_analysis = IC_analysis
+        self.IC_analysis = information_coefficient_analysis
         self.turnover_analysis = turnover_analysis
         self.code_analysis = code_analysis
 
@@ -39,11 +38,11 @@ class TurnOverAnalysis(object):
 
 
 class CodeAnalysis(object):
-    def __init__(self, name=None, industry_analysis=None, cap_analysis=None,stock_list=None):
+    def __init__(self, name=None, industry_analysis=None, cap_analysis=None, stock_list=None):
         self.name = name
         self.industry_analysis = industry_analysis
         self.cap_analysis = cap_analysis
-        self.stock_list=stock_list
+        self.stock_list = stock_list
 
 
 class IndustryAnalysis(object):
