@@ -66,9 +66,7 @@ def extreme_process(data, num=3, method='mad'):
     if isinstance(data, pd.Series):
         data_ = data.to_frame()
     data_ = data.copy()
-    factor_name = set(data.columns) - {'M004023', 'group', 'ret'}
-    assert len(factor_name) == 1, 'there should be only one factor, got {} for {}'.format(len(factor_name), factor_name)
-    factor_name = factor_name.pop()
+    factor_name = get_factor_name(data)
     mu = data[factor_name].mean()
     ind = mean_abs_deviation(data[factor_name]) if method == 'mad' else data[factor_name].std()
     try:
@@ -92,7 +90,7 @@ def data_scale(data, cap=None, method='normal'):
         标准化处理后的数据
     """
     if method == 'normal':
-        return (data-data.mean())/data.std()
+        return (data - data.mean()) / data.std()
 
     elif method == 'cap':
         if isinstance(cap, pd.DataFrame):
@@ -170,4 +168,9 @@ def get_grouped_data(fac_ret_cap, col_name, num_group, ascending):
     return dfg
 
 
-
+def get_factor_name(fac_ret):
+    keep_columns = ['M004023', 'benchmark_returns', 'ret', 'group']
+    factor_name = set(fac_ret.columns) - set(keep_columns)
+    assert len(factor_name) == 1, "there should be only one factor, got {}".format(factor_name)
+    factor_name = factor_name.pop()
+    return factor_name

@@ -9,15 +9,17 @@ from scipy.stats import pearsonr
 from six import string_types
 
 from data_type import *
+from factors.util import get_factor_name
 from get_data import *
 from metrics import return_perf_metrics, information_coefficient
 from util import extreme_process
 
 
-def prepare_data(factor_name, index_code, start_date, end_date, freq):
+def prepare_data(factor_name, index_code, benchmark_code, start_date, end_date, freq):
     """
     获取因子数据及股票对应的下一期收益率与市值
     Args:
+        benchmark_code:
         factor_name (str): 因子名称, 例如 'M004023'
         index_code (str): 六位指数代码, 例如 '000300'
         start_date (str): 开始日期, YYYY-mm-dd
@@ -34,6 +36,13 @@ def prepare_data(factor_name, index_code, start_date, end_date, freq):
 
     dts = sorted(raw_fac.index.get_level_values(0).unique())
     s, e = str(dts[0]), str(dts[-1])
+
+    benchmark_returns = csf.get_index_hist_bar(index_code=benchmark_code, start_date=start_date, end_date=end_date,
+                                               field=['close']).rename(columns={'close': 'benchmark_returns'})
+    benchmark_returns.index = benchmark_returns.index.map(lambda dt: str(dt.date()))
+    benchmark_returns.index.name = 'date'
+    benchmark_returns = benchmark_returns.loc[dts, :]
+    benchmark_returns = benchmark_returns.pct_change().shift(-1).dropna()
 
     stocks = sorted([str(c) for c in raw_fac.index.get_level_values(1).unique()])
 
@@ -78,6 +87,8 @@ def prepare_data(factor_name, index_code, start_date, end_date, freq):
     # 去掉由于停牌等无法算出收益率的股票
     fac_ret = raw_fac.join(returns).dropna()
 
+    fac_ret = fac_ret.join(benchmark_returns)
+
     return fac_ret
 
 
@@ -93,10 +104,7 @@ def add_group(fac_ret, num_group=5, ascending=True):
     """
 
     def __add_group(frame):
-
-        keep_columns = ['M004023', 'ret']
-        factor_name = list(set(frame.columns) - set(keep_columns))
-        factor_name = factor_name[0]
+        factor_name = get_factor_name(frame)
         rnk = frame.loc[:, factor_name].rank(method='first', na_option='bottom', ascending=ascending)
         labels = ['Q{:0>2}'.format(i) for i in range(1, num_group + 1)]
         category = pd.cut(rnk, bins=num_group, labels=labels).astype(str)
@@ -173,7 +181,7 @@ def raw_data_plotting():
     pass
 
 
-def return_analysis(fac_ret_data, bench_returns):
+def return_analysis(fac_ret_data):
     """
     收益率分析
     Args:
@@ -184,22 +192,24 @@ def return_analysis(fac_ret_data, bench_returns):
     Raises:
         ValueError, 当bench_returns index 不能包含(覆盖)fac_ret_returns
     """
+    #
+    # fac_index_start = fac_ret_data.index.get_level_values(0)[0]
+    # fac_index_end = fac_ret_data.index.get_level_values(0)[-1]
 
-    fac_index_start = fac_ret_data.index.get_level_values(0)[0]
-    fac_index_end = fac_ret_data.index.get_level_values(0)[-1]
+    benchmark_returns = fac_ret_data.groupby(level=0)['benchmark_returns'].head(1).reset_index(level=1, drop=True)
 
-    bench_index_start = bench_returns.index[0]
-    bench_index_end = bench_returns.index[-1]
-
-    if bench_index_start > fac_index_start or bench_index_end < fac_index_end:
-        raise ValueError('bench_return index should contains fac_ret_data index')
+    # bench_index_start = bench_returns.index[0]
+    # bench_index_end = bench_returns.index[-1]
+    #
+    # if bench_index_start > fac_index_start or bench_index_end < fac_index_end:
+    #     raise ValueError('bench_return index should contains fac_ret_data index')
 
     group_mean = fac_ret_data.groupby([fac_ret_data.index.get_level_values(0), fac_ret_data['group']])[['ret']].mean()
     group_mean = group_mean.to_panel()['ret']
     group_mean['Q_LS'] = group_mean.ix[:, 0] - group_mean.ix[:, -1]
     return_stats = pd.DataFrame()
     for col in group_mean.columns:
-        return_stats[col] = return_perf_metrics(group_mean[col], bench_returns)
+        return_stats[col] = return_perf_metrics(group_mean[col], benchmark_returns)
 
     ret = ReturnAnalysis()
     ret.return_stats = return_stats
@@ -218,9 +228,7 @@ def information_coefficient_analysis(fac_ret_data, ic_method='normal'):
     Returns:
         ICAnalysis
     """
-    factor_name = set(fac_ret_data.columns) - set(['M004023', 'ret', 'group'])
-    assert len(factor_name) == 1, "there should be only one factor, got {}".format(factor_name)
-    factor_name = factor_name.pop()
+    factor_name = get_factor_name(fac_ret_data)
     ic_series = fac_ret_data.groupby(level=0).apply(
         lambda frame: information_coefficient(frame[factor_name], frame['ret'], ic_method))
     ic = ic_series.map(lambda e: e[0])
@@ -257,7 +265,7 @@ def IC_decay(fac_ret_cap):
     n = len(grouped)
     lag = min(n, 12)
 
-    factor_name = (set(fac_ret_cap.columns) - {'M004023', 'ret', 'group'}).pop()
+    factor_name = get_factor_name(fac_ret_cap)
 
     rets = []
     dts = [dt for dt, _ in grouped]
@@ -313,9 +321,7 @@ def turnover_analysis(fac_ret_data, turnover_method='count'):
 
     def auto_correlation(fac_ret_data_):
 
-        factor_name = set(fac_ret_data_.columns) - set(['M004023', 'ret', 'group'])
-        assert len(factor_name) == 1, "there should be only one factor, got {}".format(factor_name)
-        factor_name = factor_name.pop()
+        factor_name = get_factor_name(fac_ret_data_)
 
         grouped = fac_ret_data_.groupby(level=0)
         n = len(grouped)

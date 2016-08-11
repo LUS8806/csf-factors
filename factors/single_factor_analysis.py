@@ -1,5 +1,6 @@
 # coding: utf8
 from factors.data_type import FactorData
+from factors.util import get_factor_name
 
 
 def single_factor_analysis(data, pipeline):
@@ -30,8 +31,6 @@ def single_factor_analysis(data, pipeline):
     for func in pipeline[-1]:
         result_dict[func.__name__] = func(X)
 
-    factor_name = set(data.columns) - {'M004023', 'group', 'ret'}
-    assert len(factor_name) == 1, 'there should be only one factor, got {} for {}'.format(len(factor_name), factor_name)
-    factor_name = factor_name.pop()
+    factor_name = get_factor_name(data)
     factor_result = FactorData(name=factor_name, **result_dict)
     return factor_result
