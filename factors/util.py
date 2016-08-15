@@ -76,29 +76,34 @@ def extreme_process(data, num=3, method='mad'):
     return data_
 
 
-def data_scale(data, cap=None, method='normal'):
+def data_scale(data, method='normal'):
     """
     数据标准化处理
-
-    :param data: pd.Series or pd.DataFrame
-    :param method: str
+    Args:
+        data (DataFrame): 数据框
+        method (str): 标准化方法
         "normal": (x-x.mean())/x.std()
         "cap": (x - cap_weighted_mean of x)/x.std()
-        "industry":
-
-    :return: pd.Series or pd.DataFrame
-        标准化处理后的数据
+    Returns:
+        DataFrame 标准化处理后的数据
+    Raises:
+        ValueError
     """
+    data_ = data.copy()
+
+    factor_name = get_factor_name(data_)
+
     if method == 'normal':
-        return (data - data.mean()) / data.std()
-
+        data_.loc[:, factor_name] = ((data_.loc[:, factor_name] - data_.loc[:, factor_name].mean())
+                                     / data_.loc[:, factor_name].std())
     elif method == 'cap':
-        if isinstance(cap, pd.DataFrame):
-            cap = cap.ix[:, 0]
-        return data.apply(lambda x: (x - np.sum(x * cap) / cap.sum()) / x.std())
-
+        cap_weight = data_.loc[:, 'M004023'] / data_.loc[:, 'M004023'].sum()
+        avg = (data_.loc[:, 'M004023'] * cap_weight).sum()
+        data_.loc[:, factor_name] = (data_.loc[:, factor_name] -avg) / data_.loc[:, factor_name].std()
     else:
-        raise ValueError
+        raise ValueError('标准化算法现在仅支持normal与cap')
+
+    return data_
 
 
 def cut_group(data_, num_group, col_name=None, ascending=False):

@@ -13,6 +13,7 @@ from factors.util import get_factor_name
 from get_data import *
 from metrics import return_perf_metrics, information_coefficient
 from util import extreme_process
+from util import scale
 
 
 def prepare_data(factor_name, index_code, benchmark_code, start_date, end_date, freq):
@@ -120,6 +121,10 @@ def add_group(fac_ret, num_group=5, ascending=True):
 
 def de_extreme(fac_ret_data, num=1, method='mad'):
     return fac_ret_data.groupby(level=0).apply(extreme_process, num=num, method=method)
+
+
+def standardize(fac_ret_data, method='normal'):
+    return fac_ret_data.groupby(level=0).apply(scale, method=method)
 
 
 def filter_out_st(fac_ret):
