@@ -13,7 +13,7 @@ from factors.util import get_factor_name
 from get_data import *
 from metrics import return_perf_metrics, information_coefficient
 from util import extreme_process
-from util import scale
+from util import data_scale
 
 
 def prepare_data(factor_name, index_code, benchmark_code, start_date, end_date, freq):
@@ -34,6 +34,9 @@ def prepare_data(factor_name, index_code, benchmark_code, start_date, end_date, 
     factor_names = [factor_name] + ['M004023']
     factor_names = [str(n) for n in factor_names]
     raw_fac = get_raw_factor(factor_names, index_code, start_date, end_date, freq)
+    raw_fac = raw_fac.rename(columns={'M004023': 'cap'})
+    if factor_name == 'M004023':
+        raw_fac.loc[:, 'M004023'] = raw_fac.cap
 
     dts = sorted(raw_fac.index.get_level_values(0).unique())
     s, e = str(dts[0]), str(dts[-1])
@@ -124,7 +127,7 @@ def de_extreme(fac_ret_data, num=1, method='mad'):
 
 
 def standardize(fac_ret_data, method='normal'):
-    return fac_ret_data.groupby(level=0).apply(scale, method=method)
+    return fac_ret_data.groupby(level=0).apply(data_scale, method=method)
 
 
 def filter_out_st(fac_ret):
@@ -301,7 +304,7 @@ def turnover_analysis(fac_ret_data, turnover_method='count'):
 
     # code_and_cap: index:dts, columns:groups, elements:dict, keys-->tick, values-->cap
     code_and_cap = (fac_ret_data.groupby([fac_ret_data.index.get_level_values(0), fac_ret_data.group])
-                    .apply(lambda frame: dict(zip(frame.index.get_level_values(1), frame['M004023'])))
+                    .apply(lambda frame: dict(zip(frame.index.get_level_values(1), frame['cap'])))
                     .unstack()
                     )
 
@@ -385,7 +388,7 @@ def code_analysis(fac_ret_data, plot=False):
     # index:dt, columns:group
     stocks_per_dt_group = grouped.apply(lambda frame_: tuple(frame_.index.get_level_values(1))).unstack()
 
-    mean_cap_per_dt_group = grouped.apply(lambda frame_: frame_['M004023'].mean()).unstack()  # index:dt, columns:group
+    mean_cap_per_dt_group = grouped.apply(lambda frame_: frame_['cap'].mean()).unstack()  # index:dt, columns:group
 
     mean_cap_per_group = mean_cap_per_dt_group.mean()
 
