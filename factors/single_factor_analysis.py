@@ -17,7 +17,7 @@ def single_factor_analysis(data, pipeline):
         from analysis import prepare_data, add_group, de_extreme
         from analysis import information_coefficient_analysis, return_analysis, code_analysis, turnover_analysis
 
-        data = prepare_data(factor_name="M004009", index_code='000300',
+        data = prepare_data(factor_name="M004009", index_code='000300', benchmark_code='000300',
         start_date='2015-01-01', end_date='2016-01-01, freq='M')
         pipeline = [filter_out_st, filter_out_suspend, filter_out_recently_ipo, add_group, de_extreme,
         (information_coefficient_analysis, return_analysis, code_analysis, turnover_analysis)]

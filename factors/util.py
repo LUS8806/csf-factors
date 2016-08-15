@@ -169,6 +169,15 @@ def get_grouped_data(fac_ret_cap, col_name, num_group, ascending):
 
 
 def get_factor_name(fac_ret):
+    """
+    在单因子分析中,有因子,因子对应的下期收益率, benchmark下期收益率, 市值, 分组列,本函数取得因子列的列名称.
+
+    Args:
+        fac_ret: 一个数据框
+
+    Returns:
+        str: 因子名称
+    """
     keep_columns = ['M004023', 'benchmark_returns', 'ret', 'group']
     factor_name = set(fac_ret.columns) - set(keep_columns)
     assert len(factor_name) == 1, "there should be only one factor, got {}".format(factor_name)
