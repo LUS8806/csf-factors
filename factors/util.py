@@ -97,8 +97,8 @@ def data_scale(data, method='normal'):
         data_.loc[:, factor_name] = ((data_.loc[:, factor_name] - data_.loc[:, factor_name].mean())
                                      / data_.loc[:, factor_name].std())
     elif method == 'cap':
-        cap_weight = data_.loc[:, 'M004023'] / data_.loc[:, 'M004023'].sum()
-        avg = (data_.loc[:, 'M004023'] * cap_weight).sum()
+        cap_weight = data_.loc[:, 'cap'] / data_.loc[:, 'cap'].sum()
+        avg = (data_.loc[:, 'cap'] * cap_weight).sum()
         data_.loc[:, factor_name] = (data_.loc[:, factor_name] -avg) / data_.loc[:, factor_name].std()
     else:
         raise ValueError('标准化算法现在仅支持normal与cap')
@@ -183,7 +183,7 @@ def get_factor_name(fac_ret):
     Returns:
         str: 因子名称
     """
-    keep_columns = ['M004023', 'benchmark_returns', 'ret', 'group']
+    keep_columns = ['cap', 'benchmark_returns', 'ret', 'group']
     factor_name = set(fac_ret.columns) - set(keep_columns)
     assert len(factor_name) == 1, "there should be only one factor, got {}".format(factor_name)
     factor_name = factor_name.pop()
