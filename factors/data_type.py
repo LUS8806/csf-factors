@@ -11,10 +11,11 @@ class FactorData(object):
 
 
 class ReturnAnalysis(object):
-    def __init__(self, factor_name=None, return_stats=None,
+    def __init__(self, factor_name=None, return_stats=None, benchmark_return=None,
                  group_mean_return=None, group_cum_return=None):
         self.name = factor_name
         self.return_stats = return_stats
+        self.benchmark_return = benchmark_return
         self.group_mean_return = group_mean_return
         self.group_cum_return = group_cum_return
 

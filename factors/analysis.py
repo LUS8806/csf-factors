@@ -12,8 +12,8 @@ from data_type import *
 from factors.util import get_factor_name
 from get_data import *
 from metrics import return_perf_metrics, information_coefficient
-from util import extreme_process
 from util import data_scale
+from util import extreme_process
 
 
 def prepare_data(factor_name, index_code, benchmark_code, start_date, end_date, freq):
@@ -220,6 +220,7 @@ def return_analysis(fac_ret_data):
         return_stats[col] = return_perf_metrics(group_mean[col], benchmark_returns)
 
     ret = ReturnAnalysis()
+    ret.benchmark_return = benchmark_returns
     ret.return_stats = return_stats
     ret.group_mean_return = group_mean
     ret.group_cum_return = (group_mean + 1).cumprod() - 1
