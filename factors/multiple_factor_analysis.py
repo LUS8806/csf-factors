@@ -24,10 +24,10 @@ def score(fac_ret_data, method='equal_weighted', asending=False, rank_method='fi
                             * bottom: smallest rank if descending
         score_window (int): 滑动窗口大小, 对equal_weighted无效
 
-
-
     Returns:
         DataFrame, 打完分的DataFrame
+    Raises:
+        KeyError, 如果输入的打分方法有误,会引发该错误.
 
     """
     facotr_names = set(fac_ret_data.columns) - {'ret', 'cap', 'benchmark_returns', 'group'}
@@ -53,7 +53,7 @@ def score(fac_ret_data, method='equal_weighted', asending=False, rank_method='fi
         Args:
 
         Returns:
-
+            DataFrame: 因子rank
         """
         if isinstance(asending, bool):
             rnk = fac_ret_data[facotr_names].groupby(level=0).rank(ascending=asending, na_option=na_option,
