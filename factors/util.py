@@ -185,6 +185,6 @@ def get_factor_name(fac_ret):
     """
     keep_columns = ['cap', 'benchmark_returns', 'ret', 'group']
     factor_name = set(fac_ret.columns) - set(keep_columns)
-    assert len(factor_name) == 1, "there should be only one factor, got {}".format(factor_name)
+    # assert len(factor_name) == 1, "there should be only one factor, got {}".format(factor_name)
     factor_name = factor_name.pop()
     return factor_name

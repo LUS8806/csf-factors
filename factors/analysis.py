@@ -29,13 +29,15 @@ def prepare_data(factor_name, index_code, benchmark_code, start_date, end_date, 
     Returns:
         DataFrame: 原始因子与其下期收益率
     """
-    if not isinstance(factor_name, string_types):
-        raise TypeError('factor name should be a string, but its type is {}'.format(type(factor_name)))
-    factor_names = [factor_name] + ['M004023']
+    if isinstance(factor_name, string_types):
+        factor_name_ = [factor_name]
+    elif isinstance(factor_name, (list, tuple)):
+        factor_name_ = list(factor_name)
+    factor_names = factor_name_ + ['M004023']
     factor_names = [str(n) for n in factor_names]
     raw_fac = get_raw_factor(factor_names, index_code, start_date, end_date, freq)
     raw_fac = raw_fac.rename(columns={'M004023': 'cap'})
-    if factor_name == 'M004023':
+    if 'M004023' in factor_name_:
         raw_fac.loc[:, 'M004023'] = raw_fac.cap
 
     dts = sorted(raw_fac.index.get_level_values(0).unique())
