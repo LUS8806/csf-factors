@@ -218,17 +218,8 @@ def return_analysis(fac_ret_data):
     Raises:
         ValueError, 当bench_returns index 不能包含(覆盖)fac_ret_returns
     """
-    #
-    # fac_index_start = fac_ret_data.index.get_level_values(0)[0]
-    # fac_index_end = fac_ret_data.index.get_level_values(0)[-1]
 
     benchmark_returns = fac_ret_data.groupby(level=0)['benchmark_returns'].head(1).reset_index(level=1, drop=True)
-
-    # bench_index_start = bench_returns.index[0]
-    # bench_index_end = bench_returns.index[-1]
-    #
-    # if bench_index_start > fac_index_start or bench_index_end < fac_index_end:
-    #     raise ValueError('bench_return index should contains fac_ret_data index')
 
     group_mean = fac_ret_data.groupby([fac_ret_data.index.get_level_values(0), fac_ret_data['group']])[['ret']].mean()
     group_mean = group_mean.to_panel()['ret']
