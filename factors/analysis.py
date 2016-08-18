@@ -98,20 +98,36 @@ def prepare_data(factor_name, index_code, benchmark_code, start_date, end_date, 
     return fac_ret
 
 
-def add_group(fac_ret, num_group=5, ascending=True):
+def add_group(fac_ret, num_group=5, ascending=True, method='first', na_option='keep'):
     """
     添加一个分组列
     Args:
-        fac_ret (DataFrame): 一个Multi-index数据框, 含有因子,市值, 下期收益率数据
+        fac_ret (DataFrame): 一个Multi-index数据框, 含有因子,市值, 下期收益率数据, 仅支持一个因子
         num_group (int): 组数
         ascending (bool): 是否升序排列
+        method (str) : {'average', 'min', 'max', 'first', 'dense'}
+                            * average: average rank of group
+                            * min: lowest rank in group
+                            * max: highest rank in group
+                            * first: ranks assigned in order they appear in the array
+                            * dense: like 'min', but rank always increases by 1 between groups
+        na_option (str): {'keep', 'top', 'bottom'}
+                            * keep: leave NA values where they are
+                            * top: smallest rank if ascending
+                            * bottom: smallest rank if descending
     Returns:
         DataFrame, 比fac_ret 多了一列, 列名是group
     """
 
     def __add_group(frame):
         factor_name = get_factor_name(frame)
-        rnk = frame.loc[:, factor_name].rank(method='first', na_option='bottom', ascending=ascending)
+
+        rnk = frame[factor_name].rank(ascending=ascending, na_option=na_option, method=method)
+        # 假设有k个NA, 未执行下句时, rank 值 从1..(N-k), 执行后, rnk值是从k+1..N
+        rnk += rnk.isnull().sum()
+        # fillna后, NA的rank被置为0.
+        rnk = rnk.fillna(0.0)
+
         labels = ['Q{:0>2}'.format(i) for i in range(1, num_group + 1)]
         category = pd.cut(rnk, bins=num_group, labels=labels).astype(str)
         category.name = 'group'
