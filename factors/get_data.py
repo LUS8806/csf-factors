@@ -6,10 +6,14 @@
 从csf数据接口获取分析用的数据
 """
 
-import pandas as pd
-import csf
 import os
-from dateutil.parser import  parse
+
+import csf
+import pandas as pd
+from joblib import Parallel
+from joblib import delayed
+
+from factors.util import batch
 
 
 def get_trade_calendar():
@@ -35,7 +39,7 @@ def get_stock_industry(codes):
 
     if codes_len > 100:
         cutter = range(0, codes_len, 100)
-        cutter.append(codes_len-1)
+        cutter.append(codes_len - 1)
         dict_cutter = zip(cutter[0:-1], cutter[1:])
         df = pd.DataFrame()
         for i, j in dict_cutter:
@@ -60,7 +64,9 @@ def get_benchmark_return(bench_code, dt_index):
     field = ['close']
     df = csf.get_index_hist_bar(
         index_code=bench_code, start_date=st, end_date=et, field=field)
-    price = df['close'].ix[dt_index, :]
+    price = df[field].ix[dt_index, :].rename(columns={'close': 'benchmark_returns'})
+    price.index = price.index.map(lambda dt: str(dt.date()))
+    price.index.name = 'date'
     ret = price.pct_change().shift(-1).dropna()
     return ret
 
@@ -94,7 +100,6 @@ def get_term_return(index_code, dt_index):
 
 
 def get_cap_data(index_code, start_date, end_date, freq='M'):
-
     """
     总市值数据
     :param index_code: str, 指数代码，如"000300"
@@ -120,17 +125,18 @@ def get_index_component(index_code, date):
 def get_stock_lst_date(codes):
     """
     股票首次上市日期
-    :param codes: list, 股票代码列表
-    :param date: str， 日期'2015-04-30'
-    :return:
+    Args:
+        codes (list): 股票代码列表
+    Returns:
+        DataFrame, 两列, 一列是code, 六位股票代码, 一列是listing_date
     """
-    field = ['dt']
-    df = pd.Series(index=codes)
-    for code in codes:
-        df['code'] = csf.get_stock_ipo_info(code, field=field).dt[0]
-    return df
-
-
+    ipo_info = Parallel(n_jobs=20, backend='threading', verbose=5)(
+        delayed(csf.get_stock_ipo_info)(code, field=['code', 'dt'])
+        for code in codes)
+    ipo_info = pd.concat(ipo_info, ignore_index=True)
+    ipo_info.loc[:, 'code'] = ipo_info.code.str.slice(0, 6)
+    ipo_info = ipo_info.rename(columns={'dt': 'listing_date'})
+    return ipo_info
 
 
 def get_csf_index_factor_data():
@@ -142,7 +148,48 @@ def get_csf_index_factor_data():
     pass
 
 
+def get_st_stock_today(date=None):
+    return csf.get_st_stock_today(date)
 
 
+def get_stock_sus_today(date):
+    return csf.get_st_stock_today(date)
 
 
+def get_stock_returns(stocks, start_date, end_date, freq):
+    close_price = Parallel(n_jobs=10, backend='threading', verbose=5)(
+        delayed(csf.get_stock_hist_bar)(code, freq,
+                                        start_date=start_date,
+                                        end_date=end_date,
+                                        field=['date', 'close'])
+        for code in stocks)
+    for start_date, p in zip(stocks, close_price):
+        p['tick'] = start_date
+    close_price = pd.concat(close_price)
+    close_price = close_price.dropna()
+    # index.name原来为空
+    close_price.index.name = 'dt'
+    # 转成一个frame, index:dt, columns:tick
+    close_price = (close_price.set_index('tick', append=True)
+                   .to_panel()['close']
+                   .sort_index()
+                   .fillna(method='ffill')
+                   )
+    # 取每个周期末
+    group_key = {'M': [close_price.index.year, close_price.index.month],
+                 'W': [close_price.index.year, close_price.index.week],
+                 'Q': [close_price.index.year, close_price.index.quarter]
+                 }
+    close_price = close_price.groupby(group_key[freq]).tail(1)
+    returns = close_price.pct_change().shift(-1).dropna(axis=1, how='all')
+    returns.index = returns.index.map(lambda dt: str(dt.date()))
+    returns.index.name = 'dt'
+    returns = returns.unstack().to_frame()
+    returns.columns = ['ret']
+    returns = returns.swaplevel(0, 1).sort_index()
+    returns.index.names = stocks.index.names
+    return returns
+
+
+def get_industries(stocks):
+    return [csf.get_stock_csf_industry(codes, field=['code', 'level2_name']) for codes in batch(stocks, n=90)]

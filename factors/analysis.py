@@ -1,15 +1,13 @@
 # -*- coding: utf-8 -*-
 
-import itertools
 from collections import Counter
 
 import numpy as np
-from joblib import Parallel, delayed
 from scipy.stats import pearsonr
 from six import string_types
 
 from data_type import *
-from factors.util import get_factor_name
+from factors.util import get_factor_name, window
 from get_data import *
 from metrics import return_perf_metrics, information_coefficient
 from util import data_scale
@@ -43,51 +41,15 @@ def prepare_data(factor_name, index_code, benchmark_code, start_date, end_date, 
     dts = sorted(raw_fac.index.get_level_values(0).unique())
     s, e = str(dts[0]), str(dts[-1])
 
-    benchmark_returns = csf.get_index_hist_bar(index_code=benchmark_code, start_date=start_date, end_date=end_date,
-                                               field=['close']).rename(columns={'close': 'benchmark_returns'})
-    benchmark_returns.index = benchmark_returns.index.map(lambda dt: str(dt.date()))
-    benchmark_returns.index.name = 'date'
-    benchmark_returns = benchmark_returns.loc[dts, :]
-    benchmark_returns = benchmark_returns.pct_change().shift(-1).dropna()
-
+    # benchmark_returns = csf.get_index_hist_bar(index_code=benchmark_code, start_date=start_date, end_date=end_date,
+    #                                            field=['close']).rename(columns={'close': 'benchmark_returns'})
+    # benchmark_returns.index = benchmark_returns.index.map(lambda dt: str(dt.date()))
+    # benchmark_returns.index.name = 'date'
+    # benchmark_returns = benchmark_returns.loc[dts, :]
+    # benchmark_returns = benchmark_returns.pct_change().shift(-1).dropna()
+    benchmark_returns = get_benchmark_return(bench_code=benchmark_code, dt_index=dts)
     stocks = sorted([str(c) for c in raw_fac.index.get_level_values(1).unique()])
-
-    close_price = Parallel(n_jobs=10, backend='threading', verbose=5)(
-        delayed(csf.get_stock_hist_bar)(code, freq,
-                                        start_date=s,
-                                        end_date=e,
-                                        field=['date', 'close'])
-        for code in stocks)
-    for s, p in zip(stocks, close_price):
-        p['tick'] = s
-    close_price = pd.concat(close_price)
-
-    close_price = close_price.dropna()
-
-    # index.name原来为空
-    close_price.index.name = 'dt'
-
-    # 转成一个frame, index:dt, columns:tick
-    close_price = (close_price.set_index('tick', append=True)
-                   .to_panel()['close']
-                   .sort_index()
-                   .fillna(method='ffill')
-                   )
-    # 取每个周期末
-    group_key = {'M': [close_price.index.year, close_price.index.month],
-                 'W': [close_price.index.year, close_price.index.week],
-                 'Q': [close_price.index.year, close_price.index.quarter]
-                 }
-    close_price = close_price.groupby(group_key[freq]).tail(1)
-
-    returns = close_price.pct_change().shift(-1).dropna(axis=1, how='all')
-
-    returns.index = returns.index.map(lambda dt: str(dt.date()))
-    returns.index.name = 'dt'
-    returns = returns.unstack().to_frame()
-    returns.columns = ['ret']
-    returns = returns.swaplevel(0, 1).sort_index()
-    returns.index.names = raw_fac.index.names
+    returns = get_stock_returns(stocks, s, e, freq)
 
     # 去掉最后一期数据
     # 去掉由于停牌等无法算出收益率的股票
@@ -158,7 +120,7 @@ def filter_out_st(fac_ret):
         DataFrame, 不包含停牌股票的fac_ret
     """
     dts = sorted(fac_ret.index.get_level_values(0).unique())
-    st_stocks = Parallel(n_jobs=20, backend='threading', verbose=5)(delayed(csf.get_st_stock_today)(dt)
+    st_stocks = Parallel(n_jobs=20, backend='threading', verbose=5)(delayed(get_st_stock_today)(dt)
                                                                     for dt in dts)
     st_stocks = pd.concat(st_stocks, ignore_index=True)
     st_stocks.loc[:, 'code'] = st_stocks.code.str.slice(0, 6)
@@ -170,7 +132,7 @@ def filter_out_st(fac_ret):
 
 def filter_out_suspend(fac_ret):
     dts = sorted(fac_ret.index.get_level_values(0).unique())
-    suspend_stocks = Parallel(n_jobs=20, backend='threading', verbose=5)(delayed(csf.get_stock_sus_today)(date=dt)
+    suspend_stocks = Parallel(n_jobs=20, backend='threading', verbose=5)(delayed(get_stock_sus_today)(date=dt)
                                                                          for dt in dts)
     for (dt, frame) in zip(dts, suspend_stocks):
         frame.loc[:, 'date'] = dt
@@ -185,12 +147,7 @@ def filter_out_suspend(fac_ret):
 
 def filter_out_recently_ipo(fac_ret, days=20):
     stocks = sorted(fac_ret.index.get_level_values(1).unique())
-    ipo_info = Parallel(n_jobs=20, backend='threading', verbose=5)(
-        delayed(csf.get_stock_ipo_info)(stock, field=['code', 'dt'])
-        for stock in stocks)
-    ipo_info = pd.concat(ipo_info, ignore_index=True)
-    ipo_info.loc[:, 'code'] = ipo_info.code.str.slice(0, 6)
-    ipo_info = ipo_info.rename(columns={'dt': 'listing_date'})
+    ipo_info = get_stock_lst_date(stocks)
     fac_ret_ = fac_ret.reset_index()
     merged = pd.merge(fac_ret_, ipo_info, on='code')
 
@@ -404,7 +361,7 @@ def code_analysis(fac_ret_data, plot=False):
 
     stocks = sorted(fac_ret_data.index.get_level_values(1).unique())
 
-    industries = [csf.get_stock_csf_industry(codes, field=['code', 'level2_name']) for codes in batch(stocks, n=90)]
+    industries = get_industries(stocks)
 
     industries = pd.concat(industries)
     industries.loc[:, 'code'] = industries.code.str.slice(0, 6)
@@ -435,30 +392,3 @@ def code_analysis(fac_ret_data, plot=False):
     ret.stock_list = stocks_per_dt_group
 
     return ret
-
-
-def window(seq, n=2, longest=False):
-    """Returns a sliding window (of width n) over data from the iterable
-       s -> (s0,s1,...s[n-1]), (s1,s2,...,sn), ...
-
-    Args:
-        longest: if True, get full length of seq,
-        e.g. window([1,2,3,4], 3, longest=True) --->
-        (1,2,3), (2,3,4), (3,4,None), (4,None,None)
-    """
-    if longest:
-        it = itertools.chain(iter(seq), [None] * (n - 1))
-    else:
-        it = iter(seq)
-    result = tuple(itertools.islice(it, n))
-    if len(result) == n:
-        yield result
-    for elem in it:
-        result = result[1:] + (elem,)
-        yield result
-
-
-def batch(iterable, n=1):
-    l = len(iterable)
-    for ndx in range(0, l, n):
-        yield iterable[ndx:min(ndx + n, l)]
