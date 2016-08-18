@@ -10,6 +10,7 @@ from data_type import *
 from factors.util import get_factor_name, window
 from get_data import *
 from metrics import return_perf_metrics, information_coefficient
+from plot import plot_ic, plot_ret, plot_turnover, plot_code_result
 from util import data_scale
 from util import extreme_process
 
@@ -164,12 +165,13 @@ def raw_data_plotting():
     pass
 
 
-def return_analysis(fac_ret_data):
+def return_analysis(fac_ret_data, plot=False):
     """
     收益率分析
     Args:
         fac_ret_data (DataFrame): 含有因子,市值,收益率,分组的数据框.且分组的列名称为'group'
         bench_returns (Series): benchmark的收益率
+        plot (bool): 是否画图
     Returns:
         ReturnAnalysis
     Raises:
@@ -190,16 +192,20 @@ def return_analysis(fac_ret_data):
     ret.return_stats = return_stats
     ret.group_mean_return = group_mean
     ret.group_cum_return = (group_mean + 1).cumprod() - 1
+
+    if plot:
+        plot_ret(ret)
     return ret
 
 
-def information_coefficient_analysis(fac_ret_data, ic_method='normal'):
+def information_coefficient_analysis(fac_ret_data, ic_method='normal', plot=False):
     """
     信息系数（IC）分析
 
     Args:
         fac_ret_data (DataFrame): 含有因子,市值,收益率,分组的数据框.且分组的列名称为'group'
         ic_method (str): ic计算方法, 有normal, rank, rank_adj
+        plot (bool): 是否画图
     Returns:
         ICAnalysis
     """
@@ -226,6 +232,9 @@ def information_coefficient_analysis(fac_ret_data, ic_method='normal'):
     ret.IC_decay = ic_decay
     ret.IC_statistics = ic_statistics
     ret.groupIC = group_ic
+
+    if plot:
+        plot_ic(ret)
     return ret
 
 
@@ -258,12 +267,13 @@ def IC_decay(fac_ret_cap):
     return decay
 
 
-def turnover_analysis(fac_ret_data, turnover_method='count'):
+def turnover_analysis(fac_ret_data, turnover_method='count', plot=False):
     """
     换手率分析
     Args:
         fac_ret_data (DataFrame): 一个Multi index 数据框, 含有factor, ret, cap, group列
         turnover_method (str): count or cap_weighted
+        plot (bool): 是否画图
     Returns:
         TurnoverAnalysis
     """
@@ -336,17 +346,21 @@ def turnover_analysis(fac_ret_data, turnover_method='count'):
     auto_corr = auto_correlation(fac_ret_data)
     ret.auto_correlation = auto_corr
     ret.turnover = turnov
+    if plot:
+        plot_turnover(ret)
     return ret
 
 
 def code_analysis(fac_ret_data, plot=False):
     """
     选股结果分析
-    fac_ret_data:
-    plot:
+    含有因子,市值,收益率,分组的数据框.且分组的列名称为'group'
 
     Args:
         fac_ret_data (DataFrame):  一个Multi index 数据框, 含有factor, ret, cap, group列
+        plot (bool): 是否画图
+    Returns:
+        CodeAnalysis result
     """
     ret = CodeAnalysis()
 
@@ -390,5 +404,6 @@ def code_analysis(fac_ret_data, plot=False):
     ret.cap_analysis = mean_cap_per_dt_group
     ret.industry_analysis = IndustryAnalysis(gp_mean_per=industries_total, gp_industry_percent=dic_frame)
     ret.stock_list = stocks_per_dt_group
-
+    if plot:
+        plot_code_result(ret)
     return ret
