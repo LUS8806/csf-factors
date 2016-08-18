@@ -13,8 +13,6 @@ import pandas as pd
 from joblib import Parallel
 from joblib import delayed
 
-from factors.util import batch
-
 
 def get_trade_calendar():
     """
@@ -193,3 +191,9 @@ def get_stock_returns(stocks, start_date, end_date, freq):
 
 def get_industries(stocks):
     return [csf.get_stock_csf_industry(codes, field=['code', 'level2_name']) for codes in batch(stocks, n=90)]
+
+
+def batch(iterable, n=1):
+    l = len(iterable)
+    for ndx in range(0, l, n):
+        yield iterable[ndx:min(ndx + n, l)]
