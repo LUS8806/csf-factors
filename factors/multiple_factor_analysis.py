@@ -5,14 +5,21 @@ from factors.data_type import FactorData
 from factors.metrics import information_coefficient
 
 
-def score(fac_ret_data, method='equal_weighted', asending=False, rank_method='first', na_option='keep',
-          score_window=12):
+def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='first', na_option='keep', score_window=12,
+          num_group=5, group_ascending=False):
     """
     给多因子打分
     Args:
         fac_ret_data (DataFrame): multi_indexed 数据框, 有若干因子列, ret, cap, benchmark_returns等.
-        method(str): 打分方法, 等权法:equal_weighted, 市值加权:cap_weighted
-        asending (bool or dict): 默认排序, 可以是一个bool值, 所有因子相同排序, 也可以是一个字典,其key是因子名称, value是bool值.
+        method(str): 打分方法.
+                    {'equal_weighted', 'ic_weighted', 'icir_weighted', 'ret_weighted', 'ret_icir_weighted'}
+                    * equal_weighted: 等权法
+                    * ic_weighted: ic 加权
+                    * icir_weighted: icir 加权
+                    * ret_weighted: 收益率加权, 取第一个分组的平均收益率为该因子收益率.
+                    * ret_icir_weighted: 因子icir加权
+
+        ascending (bool or dict): 默认排序, 可以是一个bool值, 所有因子相同排序, 也可以是一个字典,其key是因子名称, value是bool值.
         rank_method (str) : {'average', 'min', 'max', 'first', 'dense'}
                             * average: average rank of group
                             * min: lowest rank in group
@@ -24,26 +31,29 @@ def score(fac_ret_data, method='equal_weighted', asending=False, rank_method='fi
                             * top: smallest rank if ascending
                             * bottom: smallest rank if descending
         score_window (int): 滑动窗口大小, 对equal_weighted无效
+        num_group(int): 分组数, 该参数仅对method='ret_weighted' 和 'ret_icir_weighted'有效
+        group_ascending(bool or dict): 分组时的排序, 默认值False,所有因子分组时按降序排序.
+                                       也可指定具体某一个或多个因子为升序,其他默认降序
 
     Returns:
-        DataFrame, 打完分的DataFrame
+        DataFrame, 打完分的DataFrame,
     Raises:
         KeyError, 如果输入的打分方法有误,会引发该错误.
 
     """
-    facotr_names = set(fac_ret_data.columns) - {'ret', 'cap', 'benchmark_returns', 'group'}
+    factor_names = set(fac_ret_data.columns) - {'ret', 'cap', 'benchmark_returns', 'group'}
     # 非因子列名称
-    other_names = sorted(set(fac_ret_data.columns) - facotr_names)
-    if len(facotr_names) >= 1:
-        facotr_names = sorted(facotr_names)
+    other_names = sorted(set(fac_ret_data.columns) - factor_names)
+    if len(factor_names) >= 1:
+        factor_names = sorted(factor_names)
     else:
         raise ValueError('fac_ret_data must have at least 1 factor, got 0.')
 
     def get_ic():
         ic = fac_ret_data.groupby(level=0).apply(
-            lambda frame: [information_coefficient(frame[fac], frame['ret'])[0] for fac in facotr_names])
+            lambda frame: [information_coefficient(frame[fac], frame['ret'])[0] for fac in factor_names])
         # 上一步骤得到的结果是一个序列,序列元素是一列表,需要将其拆开
-        ic = pd.DataFrame(ic.tolist(), index=ic.index, columns=facotr_names)
+        ic = pd.DataFrame(ic.tolist(), index=ic.index, columns=factor_names)
         return ic
 
     def get_rank():
@@ -56,17 +66,17 @@ def score(fac_ret_data, method='equal_weighted', asending=False, rank_method='fi
         Returns:
             DataFrame: 因子rank
         """
-        if isinstance(asending, bool):
-            rnk = fac_ret_data[facotr_names].groupby(level=0).rank(ascending=asending, na_option=na_option,
+        if isinstance(ascending, bool):
+            rnk = fac_ret_data[factor_names].groupby(level=0).rank(ascending=ascending, na_option=na_option,
                                                                    method=rank_method)
-        elif isinstance(asending, dict):
-            default_ascending = dict(zip(facotr_names, [False] * len(facotr_names)))
-            if len(asending) != len(facotr_names):
+        elif isinstance(ascending, dict):
+            default_ascending = dict(zip(factor_names, [False] * len(factor_names)))
+            if len(ascending) != len(factor_names):
                 print('ascending 长度与因子数目不同, 未指明的将按照默认降序排序(大值排名靠前).')
-            default_ascending.update(asending)
+            default_ascending.update(ascending)
             rnk_list = [fac_ret_data[col].groupby(level=0).rank(asending=default_ascending[col], na_option=na_option,
                                                                 method=rank_method)
-                        for col in facotr_names]
+                        for col in factor_names]
             rnk = pd.concat(rnk_list, axis=1)
         # 假设有k个NA, 未执行下句时, rank 值 从1..(N-k), 执行后, rnk值是从k+1..N
         rnk += rnk.isnull().sum()
@@ -81,7 +91,7 @@ def score(fac_ret_data, method='equal_weighted', asending=False, rank_method='fi
             DataFrame: 一个数据框,有score列,和ret, cap,等列
         """
         rnk = get_rank()
-        score_ = fac_ret_data[facotr_names].mul(rnk.mean(axis=1), axis=0).sum(axis=1).to_frame().rename(
+        score_ = fac_ret_data[factor_names].mul(rnk.mean(axis=1), axis=0).sum(axis=1).to_frame().rename(
             columns={0: 'score'})
 
         return score_.join(fac_ret_data[other_names])
