@@ -1,11 +1,13 @@
 # coding: utf8
 import pandas as pd
 
+from factors.analysis import add_group
 from factors.data_type import FactorData
 from factors.metrics import information_coefficient
 
 
-def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='first', na_option='keep', score_window=12,
+def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='first', na_option='keep',
+          score_window=12,
           num_group=5, group_ascending=False):
     """
     给多因子打分
@@ -31,9 +33,10 @@ def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='f
                             * top: smallest rank if ascending
                             * bottom: smallest rank if descending
         score_window (int): 滑动窗口大小, 对equal_weighted无效
-        num_group(int): 分组数, 该参数仅对method='ret_weighted' 和 'ret_icir_weighted'有效
+        num_group(int): 分组数, 该参数仅对method='ret_weighted' 有效
         group_ascending(bool or dict): 分组时的排序, 默认值False,所有因子分组时按降序排序.
-                                       也可指定具体某一个或多个因子为升序,其他默认降序
+                                       也可指定具体某一个或多个因子为升序,其他默认降序.
+                                       该参数仅对method='ret_weighted' 有效
 
     Returns:
         DataFrame, 打完分的DataFrame,
@@ -117,16 +120,30 @@ def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='f
         return score_.join(fac_ret_data[other_names])
 
     def ret_weighted():
-        raise NotImplementedError
+        first_group_returns = []
+        group_ascending_default = dict(zip(factor_names, [False] * len(factor_names)))
+        if isinstance(group_ascending, dict):
+            group_ascending_default.update(**group_ascending)
+        for factor_name in factor_names:
+            data = fac_ret_data[[factor_name] + other_names]  # perhaps only ['ret'] other than other_names
+            data = add_group(data, num_group=num_group, ascending=group_ascending_default[factor_name], method='first',
+                             na_option='keep')
+            # 取得每个因子第一个分组的收益率
+            ret = data.groupby([data.index.get_level_values(0), data.group])['ret'].mean().unstack()[['Q01']].rename(
+                columns={'Q01': factor_name})
+        returns = pd.concat(first_group_returns, axis=1)
+        returns = returns.rolling(12, min_periods=1).mean()
+        weight = returns / returns.sum(axis=1)
+        rank = get_rank()
 
-    def ret_icir_weighted():
-        raise NotImplementedError
+        score_ = (rank * weight).sum(axis=1).to_frame().rename(columns={0: 'score'})
+
+        return score_.join(fac_ret_data[other_names])
 
     valid_method = {'equal_weighted': equal_weighted,
                     'ic_weighted': ic_weighted,
                     'icir_weighted': icir_weighted,
-                    'ret_weighted': ret_weighted,
-                    'ret_icir_weighted': ret_icir_weighted}
+                    'ret_weighted': ret_weighted}
     try:
         return valid_method[method]()
     except KeyError:
