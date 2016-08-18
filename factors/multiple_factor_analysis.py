@@ -151,12 +151,13 @@ def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='f
         raise
 
 
-def multiple_factors_analysis(data, pipeline):
+def multiple_factors_analysis(data, pipeline, params=None):
     """
     多因子分析
     Args:
         data (DataFrame): 一个multi_index 数据框, 有因子, 对应下期收益率, 市值列. multi_index-->level0=dt, level1=code
         pipeline(List): 前面N-1个为对数据进行处理, 最后一个元素为一个元组,元组的元素为xxx_analysis
+        params (dict): key为pipeline里面的函数名称, value该函数的参数, 为一字典
 
     Returns:
         多因子分析结果
@@ -169,15 +170,18 @@ def multiple_factors_analysis(data, pipeline):
         start_date='2015-01-01', end_date='2016-01-01, freq='M')
         pipeline = [filter_out_st, filter_out_suspend, filter_out_recently_ipo,de_extreme, standardize, score, add_group,
         (information_coefficient_analysis, return_analysis, code_analysis, turnover_analysis)]
-        result = single_factor_analysis(pipeline)
+        params = {'de_extreme': {'num':1, 'method': 'mad'},
+                  'standardize': dict(method='cap'),
+        }
+        result = single_factor_analysis(pipeline, params)
     """
     X = data.copy()
     for func in pipeline[:-1]:
-        X = func(X)
+        X = func(X, **(params.get(func.__name__, {})))
 
     result_dict = {}
     for func in pipeline[-1]:
-        result_dict[func.__name__] = func(X)
+        result_dict[func.__name__] = func(X, **(params.get(func.__name__, {})))
 
     # factor_name = get_factor_name(data)
     factor_result = FactorData(name='multiple', **result_dict)
