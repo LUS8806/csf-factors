@@ -173,7 +173,7 @@ def multiple_factors_analysis(data, pipeline, params=None):
         params = {'de_extreme': {'num':1, 'method': 'mad'},
                   'standardize': dict(method='cap'),
         }
-        result = single_factor_analysis(pipeline, params)
+        result = multiple_factors_analysis(data, pipeline, params)
     """
     X = data.copy()
     for func in pipeline[:-1]:
