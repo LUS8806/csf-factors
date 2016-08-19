@@ -158,7 +158,7 @@ def plot_turnover(Turnover_analysis):
     plt.rcParams['figure.figsize'] = orignal_figsize
 
 
-def plot_code_result(Code_analysis):
+def plot_code_result(Code_analysis, group='Q01'):
     """
     选股结果分析作图
     :param Code_analysis:
@@ -169,31 +169,31 @@ def plot_code_result(Code_analysis):
     plt.rcParams['figure.figsize'] = (12, 4)
     plt.style.use('ggplot')
     df = Code_analysis.cap_analysis.copy()
-    industry_q = Code_analysis.industry_analysis.gp_industry_percent.loc[
-        :, Q].copy()
+    industry_q = Code_analysis.industry_analysis.gp_industry_percent[group].copy()
     gp_industry_percent = Code_analysis.industry_analysis.gp_mean_per.copy()
 
-    mean_cap = df.loc[:, 'group_cap_mean']
-    df = df.drop(['group_cap_mean'], axis=1)
-    df = df.T.loc[:, Q]
+    mean_cap = df.mean()
+
     fig = plt.figure()
     ax_cap = fig.add_subplot(121)
-    df.plot(kind='area', ax=ax_cap, title=df.name, fontsize=10)
+    df[group].plot(kind='area', ax=ax_cap, title='%s Mean Cap' %group, fontsize=10)
+
     ax_mean_cap = fig.add_subplot(122)
     mean_cap.plot(
-        kind='bar', ax=ax_mean_cap, title='Average cap', fontsize=10)
+        kind='bar', ax=ax_mean_cap, title='Mean Cap for each group', fontsize=10)
     plt.subplots_adjust(bottom=0.0, left=.01, top=0.9, right=1.5)
+
     # industry
     fig2 = plt.figure()
-    df = pd.DataFrame(industry_q.to_dict()).fillna(0).T
     import matplotlib.gridspec as gridspec
-    gs = gridspec.GridSpec(1, 3)
-    ax1 = fig2.add_subplot(gs[0, :2])
-    plot_insdustry_percent(df, ax=ax1)
-    ax2 = plt.subplot(gs[0, 2])
+    gs = gridspec.GridSpec(1, 5)
+    ax1 = fig2.add_subplot(gs[0, 0:3])
+    plot_insdustry_percent(industry_q, ax=ax1)
+    ax1.set_title('Industry distribution for %s' %group)
+    ax2 = plt.subplot(gs[0, 3:])
     gp_industry_percent = gp_industry_percent.fillna(0)
-    df2 = pd.DataFrame(gp_industry_percent.loc[:, Q])
-    plot_industry_mean_percent(df2, ax=ax2)
+
+    plot_industry_mean_percent(industry_q.mean(), ax=ax2)
     plt.subplots_adjust(bottom=0, left=.01, right=1.5, wspace=0.5)
     # plt.tight_layout(w_pad=8)
     plt.rcParams['figure.figsize'] = origin_figsize
@@ -203,9 +203,9 @@ def plot_insdustry_percent(df, ax=None):
     if ax is None:
         ax = plt.gca()
     # 取得各个style下面的color
-    colors_ = _get_colors()
+#     colors_ = _get_colors()
     ax = df.plot(
-        kind='bar', stacked=True, color=colors_, ax=ax, width=1, alpha=0.6)
+        kind='bar', stacked=True,ax=ax, width=1, alpha=0.6)
     ax, font = _show_chinese_character(ax)
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), prop=font)
     ax.set_ylim([0, 1.0])
@@ -213,22 +213,10 @@ def plot_insdustry_percent(df, ax=None):
 
 
 def plot_industry_mean_percent(df, ax=None):
-    colors_ = _get_colors()
-    ax = df.plot(kind='bar', ax=ax, color=colors_)
+    ax = df.plot(kind='pie', ax=ax)
     ax, _ = _show_chinese_character(ax)
     return ax
 
-
-def _get_colors():
-    colors_ = []
-    for sty in plt.style.available:
-        plt.style.use(sty)
-        sty_colors = [item['color']
-                      for item in list(plt.rcParams['axes.prop_cycle'])]
-        colors_.extend(sty_colors)
-    colors_ = list(set(colors_))
-    colors_ = [c for c in colors_ if len(c) > 4]
-    return colors_
 
 
 def _show_chinese_character(ax):
@@ -245,3 +233,15 @@ def _show_chinese_character(ax):
     for label in labels:
         label.set_fontproperties(font)
     return ax, font
+
+
+def _get_colors():
+    colors_ = []
+    for sty in plt.style.available:
+        plt.style.use(sty)
+        sty_colors = [item['color']
+                      for item in list(plt.rcParams['axes.prop_cycle'])]
+        colors_.extend(sty_colors)
+    colors_ = list(set(colors_))
+    colors_ = [c for c in colors_ if len(c) > 4]
+    return colors_
