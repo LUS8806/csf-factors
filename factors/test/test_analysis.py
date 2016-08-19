@@ -1,7 +1,6 @@
 from factors.analysis import filter_out_recently_ipo, filter_out_suspend, filter_out_st, return_analysis, standardize
 from factors.analysis import information_coefficient_analysis, code_analysis, turnover_analysis
 from factors.analysis import prepare_data, add_group, de_extreme
-from factors.single_factor_analysis import single_factor_analysis
 from factors.multiple_factor_analysis import score, multiple_factors_analysis
 
 
@@ -24,6 +23,7 @@ def test_multiple_factors_analysis():
                 (information_coefficient_analysis, return_analysis, code_analysis, turnover_analysis)]
     params = {'de_extreme': {'num': 1, 'method': 'mad'},
               'standardize': dict(method='cap'),
+              'return_analysis': dict(plot=True),
               }
     result = multiple_factors_analysis(data, pipeline, params)
 
