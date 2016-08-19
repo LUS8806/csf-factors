@@ -7,7 +7,7 @@ from scipy.stats import pearsonr
 from six import string_types
 
 from data_type import *
-from factors.util import get_factor_name, window
+from util import get_factor_name, window
 from get_data import *
 from metrics import return_perf_metrics, information_coefficient
 from plot import plot_ic, plot_ret, plot_turnover, plot_code_result
@@ -34,7 +34,8 @@ def prepare_data(factor_name, index_code, benchmark_code, start_date, end_date, 
         factor_name_ = list(factor_name)
     factor_names = factor_name_ + ['M004023']
     factor_names = [str(n) for n in factor_names]
-    raw_fac = get_raw_factor(factor_names, index_code, start_date, end_date, freq)
+    raw_fac = get_raw_factor(
+        factor_names, index_code, start_date, end_date, freq)
     raw_fac = raw_fac.rename(columns={'M004023': 'cap'})
     if 'M004023' in factor_name_:
         raw_fac.loc[:, 'M004023'] = raw_fac.cap
@@ -48,8 +49,10 @@ def prepare_data(factor_name, index_code, benchmark_code, start_date, end_date, 
     # benchmark_returns.index.name = 'date'
     # benchmark_returns = benchmark_returns.loc[dts, :]
     # benchmark_returns = benchmark_returns.pct_change().shift(-1).dropna()
-    benchmark_returns = get_benchmark_return(bench_code=benchmark_code, dt_index=dts)
-    stocks = sorted([str(c) for c in raw_fac.index.get_level_values(1).unique()])
+    benchmark_returns = get_benchmark_return(
+        bench_code=benchmark_code, dt_index=dts)
+    stocks = sorted([str(c)
+                     for c in raw_fac.index.get_level_values(1).unique()])
     returns = get_stock_returns(stocks, s, e, freq)
 
     # 去掉最后一期数据
@@ -85,7 +88,8 @@ def add_group(fac_ret, num_group=5, ascending=True, method='first', na_option='k
     def __add_group(frame):
         factor_name = get_factor_name(frame)
 
-        rnk = frame[factor_name].rank(ascending=ascending, na_option=na_option, method=method)
+        rnk = frame[factor_name].rank(
+            ascending=ascending, na_option=na_option, method=method)
         # 假设有k个NA, 未执行下句时, rank 值 从1..(N-k), 执行后, rnk值是从k+1..N
         rnk += rnk.isnull().sum()
         # fillna后, NA的rank被置为0.
@@ -152,7 +156,8 @@ def filter_out_recently_ipo(fac_ret, days=20):
     fac_ret_ = fac_ret.reset_index()
     merged = pd.merge(fac_ret_, ipo_info, on='code')
 
-    merged.loc[:, 'days'] = (merged.date.map(pd.Timestamp) - merged.listing_date.map(pd.Timestamp)).dt.days
+    merged.loc[:, 'days'] = (
+        merged.date.map(pd.Timestamp) - merged.listing_date.map(pd.Timestamp)).dt.days
 
     result = (merged.query('days>{}'.format(days))
               .set_index(['date', 'code'])
@@ -178,14 +183,17 @@ def return_analysis(fac_ret_data, plot=False):
         ValueError, 当bench_returns index 不能包含(覆盖)fac_ret_returns
     """
 
-    benchmark_returns = fac_ret_data.groupby(level=0)['benchmark_returns'].head(1).reset_index(level=1, drop=True)
+    benchmark_returns = fac_ret_data.groupby(
+        level=0)['benchmark_returns'].head(1).reset_index(level=1, drop=True)
 
-    group_mean = fac_ret_data.groupby([fac_ret_data.index.get_level_values(0), fac_ret_data['group']])[['ret']].mean()
+    group_mean = fac_ret_data.groupby(
+        [fac_ret_data.index.get_level_values(0), fac_ret_data['group']])[['ret']].mean()
     group_mean = group_mean.to_panel()['ret']
     group_mean['Q_LS'] = group_mean.ix[:, 0] - group_mean.ix[:, -1]
     return_stats = pd.DataFrame()
     for col in group_mean.columns:
-        return_stats[col] = return_perf_metrics(group_mean[col], benchmark_returns)
+        return_stats[col] = return_perf_metrics(
+            group_mean[col], benchmark_returns)
 
     ret = ReturnAnalysis()
     ret.benchmark_return = benchmark_returns
@@ -279,7 +287,8 @@ def turnover_analysis(fac_ret_data, turnover_method='count', plot=False):
     """
     ret = TurnOverAnalysis()
 
-    # code_and_cap: index:dts, columns:groups, elements:dict, keys-->tick, values-->cap
+    # code_and_cap: index:dts, columns:groups, elements:dict, keys-->tick,
+    # values-->cap
     code_and_cap = (fac_ret_data.groupby([fac_ret_data.index.get_level_values(0), fac_ret_data.group])
                     .apply(lambda frame: dict(zip(frame.index.get_level_values(1), frame['cap'])))
                     .unstack()
@@ -300,7 +309,8 @@ def turnover_analysis(fac_ret_data, turnover_method='count', plot=False):
         next_df = pd.Series(next_dict, name='cap').to_frame()
         next_weights = next_df.cap / next_df.cap.sum()
 
-        cur, nxt = current_weights.align(next_weights, join='outer', fill_value=0)
+        cur, nxt = current_weights.align(
+            next_weights, join='outer', fill_value=0)
         ret = (cur - nxt).abs().sum() / 2
         return ret
 
@@ -326,7 +336,8 @@ def turnover_analysis(fac_ret_data, turnover_method='count', plot=False):
                 x, y = current_frame.align(next_frame, join='inner')
                 rows.append(pearsonr(x.values, y.values)[0])
             table.append(rows)
-        auto_corr_ = pd.DataFrame(table, index=dts[:(n - lag)], columns=list(range(1, lag + 1)))
+        auto_corr_ = pd.DataFrame(
+            table, index=dts[:(n - lag)], columns=list(range(1, lag + 1)))
         return auto_corr_
 
     method = __count_turnover if turnover_method == 'count' else __capwt_turnover
@@ -364,12 +375,15 @@ def code_analysis(fac_ret_data, plot=False):
     """
     ret = CodeAnalysis()
 
-    grouped = fac_ret_data.groupby([fac_ret_data.index.get_level_values(0), fac_ret_data.group])
+    grouped = fac_ret_data.groupby(
+        [fac_ret_data.index.get_level_values(0), fac_ret_data.group])
 
     # index:dt, columns:group
-    stocks_per_dt_group = grouped.apply(lambda frame_: tuple(frame_.index.get_level_values(1))).unstack()
+    stocks_per_dt_group = grouped.apply(
+        lambda frame_: tuple(frame_.index.get_level_values(1))).unstack()
 
-    mean_cap_per_dt_group = grouped.apply(lambda frame_: frame_['cap'].mean()).unstack()  # index:dt, columns:group
+    mean_cap_per_dt_group = grouped.apply(
+        lambda frame_: frame_['cap'].mean()).unstack()  # index:dt, columns:group
 
     mean_cap_per_group = mean_cap_per_dt_group.mean()
 
@@ -382,18 +396,22 @@ def code_analysis(fac_ret_data, plot=False):
     industries_dict = dict(zip(industries.code, industries.level2_name))
 
     # code ---> industry
-    industries_per_dt_group = stocks_per_dt_group.applymap(lambda tup: tuple(industries_dict[t] for t in tup))
+    industries_per_dt_group = stocks_per_dt_group.applymap(
+        lambda tup: tuple(industries_dict[t] for t in tup))
 
     # industry tuple ---> Counter
     counter = industries_per_dt_group.applymap(lambda tup: Counter(tup))
 
     # counter ----> percent
-    counter_percent = counter.applymap(lambda dic: {k: v * 1.0 / sum(dic.values()) for k, v in dic.iteritems()})
+    counter_percent = counter.applymap(
+        lambda dic: {k: v * 1.0 / sum(dic.values()) for k, v in dic.iteritems()})
 
     dic_frame = {}
     for col in counter_percent.columns:
-        frame = pd.DataFrame(counter_percent[col].tolist(), index=counter_percent.index).fillna(0)
-        frame = frame[list(frame.iloc[0, :].sort_values(ascending=False).index)]
+        frame = pd.DataFrame(
+            counter_percent[col].tolist(), index=counter_percent.index).fillna(0)
+        frame = frame[
+            list(frame.iloc[0, :].sort_values(ascending=False).index)]
         dic_frame[col] = frame
 
     # 行业平均占比: 所有分组, 所有dt合并到一起
@@ -402,7 +420,8 @@ def code_analysis(fac_ret_data, plot=False):
     industries_total = pd.Series(industries_total).sort_values(ascending=False)
 
     ret.cap_analysis = mean_cap_per_dt_group
-    ret.industry_analysis = IndustryAnalysis(gp_mean_per=industries_total, gp_industry_percent=dic_frame)
+    ret.industry_analysis = IndustryAnalysis(
+        gp_mean_per=industries_total, gp_industry_percent=dic_frame)
     ret.stock_list = stocks_per_dt_group
     if plot:
         plot_code_result(ret)

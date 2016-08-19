@@ -44,7 +44,8 @@ def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='f
         KeyError, 如果输入的打分方法有误,会引发该错误.
 
     """
-    factor_names = set(fac_ret_data.columns) - {'ret', 'cap', 'benchmark_returns', 'group'}
+    factor_names = set(fac_ret_data.columns) - \
+        {'ret', 'cap', 'benchmark_returns', 'group'}
     # 非因子列名称
     other_names = sorted(set(fac_ret_data.columns) - factor_names)
     if len(factor_names) >= 1:
@@ -73,7 +74,8 @@ def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='f
             rnk = fac_ret_data[factor_names].groupby(level=0).rank(ascending=ascending, na_option=na_option,
                                                                    method=rank_method)
         elif isinstance(ascending, dict):
-            default_ascending = dict(zip(factor_names, [False] * len(factor_names)))
+            default_ascending = dict(
+                zip(factor_names, [False] * len(factor_names)))
             if len(ascending) != len(factor_names):
                 print('ascending 长度与因子数目不同, 未指明的将按照默认降序排序(大值排名靠前).')
             default_ascending.update(ascending)
@@ -105,7 +107,8 @@ def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='f
         weight = rolling_ic / rolling_ic.sum(axis=1)
 
         rank = get_rank()
-        score_ = (rank * weight).sum(axis=1).to_frame().rename(columns={0: 'score'})
+        score_ = (
+            rank * weight).sum(axis=1).to_frame().rename(columns={0: 'score'})
 
         return score_.join(fac_ret_data[other_names])
 
@@ -116,16 +119,19 @@ def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='f
         weight = rolling_ic / rolling_std
         weight.loc[0, :] = rolling_ic.loc[0, :]
         rank = get_rank()
-        score_ = (rank * weight).sum(axis=1).to_frame().rename(columns={0: 'score'})
+        score_ = (
+            rank * weight).sum(axis=1).to_frame().rename(columns={0: 'score'})
         return score_.join(fac_ret_data[other_names])
 
     def ret_weighted():
         first_group_returns = []
-        group_ascending_default = dict(zip(factor_names, [False] * len(factor_names)))
+        group_ascending_default = dict(
+            zip(factor_names, [False] * len(factor_names)))
         if isinstance(group_ascending, dict):
             group_ascending_default.update(**group_ascending)
         for factor_name in factor_names:
-            data = fac_ret_data[[factor_name] + other_names]  # perhaps only ['ret'] other than other_names
+            # perhaps only ['ret'] other than other_names
+            data = fac_ret_data[[factor_name] + other_names]
             data = add_group(data, num_group=num_group, ascending=group_ascending_default[factor_name], method='first',
                              na_option='keep')
             # 取得每个因子第一个分组的收益率
@@ -136,7 +142,8 @@ def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='f
         weight = returns / returns.sum(axis=1)
         rank = get_rank()
 
-        score_ = (rank * weight).sum(axis=1).to_frame().rename(columns={0: 'score'})
+        score_ = (
+            rank * weight).sum(axis=1).to_frame().rename(columns={0: 'score'})
 
         return score_.join(fac_ret_data[other_names])
 
@@ -147,7 +154,8 @@ def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='f
     try:
         return valid_method[method]()
     except KeyError:
-        print('{} is not a valid method. valid methods are: {}'.format(method, valid_method.keys()))
+        print('{} is not a valid method. valid methods are: {}'.format(
+            method, valid_method.keys()))
         raise
 
 
