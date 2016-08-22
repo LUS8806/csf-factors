@@ -26,6 +26,7 @@ def plot_ic(IC_analysis):
         plot_ic_timeseries(ic_series, window=12, ax=ax1)
         plot_ic_dist(ic_series, ax=ax2)
         plot_ic_decay(ic_decay, ax=ax3)
+    plt.show()
 
 
 def plot_ic_timeseries(ic_series, window=12, ax=None):
@@ -106,7 +107,7 @@ def plot_ret(Return_analysis):
             title = '%s mean ret dist plot'  % col_name
             ax.set_title(title)
         plt.tight_layout()
-
+    plt.show()
 
 def plot_cum_return(cum_ret, mean_ret, ax=None):
     """
@@ -156,6 +157,7 @@ def plot_turnover(Turnover_analysis):
     ax_reversal = fig_signal.add_subplot(122)
     buy_signal.reversal.plot(ax=ax_reversal, title='signal reversal')
     plt.rcParams['figure.figsize'] = orignal_figsize
+    plt.show()
 
 
 def plot_code_result(Code_analysis, group='Q01'):
@@ -197,7 +199,7 @@ def plot_code_result(Code_analysis, group='Q01'):
     plt.subplots_adjust(bottom=0, left=.01, right=1.5, wspace=0.5)
     # plt.tight_layout(w_pad=8)
     plt.rcParams['figure.figsize'] = origin_figsize
-
+    plt.show()
 
 def plot_insdustry_percent(df, ax=None):
     if ax is None:
