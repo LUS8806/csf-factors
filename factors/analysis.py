@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+from __future__ import division
 from collections import Counter
 
 import numpy as np
@@ -49,7 +49,8 @@ def prepare_data(factor_name, index_code, benchmark_code, start_date, end_date, 
     # benchmark_returns.index.name = 'date'
     # benchmark_returns = benchmark_returns.loc[dts, :]
     # benchmark_returns = benchmark_returns.pct_change().shift(-1).dropna()
-    benchmark_returns = get_benchmark_return(bench_code=benchmark_code, start_date=start_date, end_date=end_date, dt_index=dts)
+    benchmark_returns = get_benchmark_return(bench_code=benchmark_code, start_date=start_date, end_date=end_date,
+                                             dt_index=dts)
     stocks = sorted([str(c)
                      for c in raw_fac.index.get_level_values(1).unique()])
     returns = get_stock_returns(stocks, s, e, freq)
@@ -274,12 +275,13 @@ def IC_decay(fac_ret_cap):
     return decay
 
 
-def turnover_analysis(fac_ret_data, turnover_method='count', plot=False):
+def turnover_analysis(fac_ret_data, turnover_method='count', fp_month=5, plot=False):
     """
     换手率分析
     Args:
         fac_ret_data (DataFrame): 一个Multi index 数据框, 含有factor, ret, cap, group列
         turnover_method (str): count or cap_weighted
+        fp_month: 计算信号衰退与翻转的最后fp_month个月
         plot (bool): 是否画图
     Returns:
         TurnoverAnalysis
@@ -339,6 +341,21 @@ def turnover_analysis(fac_ret_data, turnover_method='count', plot=False):
             table, index=dts[:(n - lag)], columns=list(range(1, lag + 1)))
         return auto_corr_
 
+    def signal_decay_and_reversal():
+        data = (fac_ret_data.groupby([fac_ret_data.index.get_level_values(0), fac_ret_data.group])
+                .apply(lambda frame: frozenset(frame.index.get_level_values(1)))
+                .unstack()
+                )
+        group_buy = data.iloc[:, 0]
+        group_sell = data.iloc[:, -1]
+        n = len(data)
+        lag = min(n, fp_month)
+
+        decay = map(lambda x, y=group_buy[-lag]: len(x.intersection(y)) / len(x), group_buy[-lag:])
+        reversal = map(lambda x, y=group_sell[-lag]: len(x.intersection(y)) / len(x), group_sell[-lag:])
+
+        return pd.DataFrame({'decay': decay, 'reversal': reversal}, index=data.index[-lag:])
+
     method = __count_turnover if turnover_method == 'count' else __capwt_turnover
 
     dts = fac_ret_data.index.get_level_values(0).unique()[:-1]
@@ -356,6 +373,7 @@ def turnover_analysis(fac_ret_data, turnover_method='count', plot=False):
     auto_corr = auto_correlation(fac_ret_data)
     ret.auto_correlation = auto_corr
     ret.turnover = turnov
+    ret.buy_signal = signal_decay_and_reversal()
     if plot:
         plot_turnover(ret)
     return ret
