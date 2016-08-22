@@ -49,8 +49,7 @@ def prepare_data(factor_name, index_code, benchmark_code, start_date, end_date, 
     # benchmark_returns.index.name = 'date'
     # benchmark_returns = benchmark_returns.loc[dts, :]
     # benchmark_returns = benchmark_returns.pct_change().shift(-1).dropna()
-    benchmark_returns = get_benchmark_return(
-        bench_code=benchmark_code, dt_index=dts)
+    benchmark_returns = get_benchmark_return(bench_code=benchmark_code, start_date=start_date, end_date=end_date, dt_index=dts)
     stocks = sorted([str(c)
                      for c in raw_fac.index.get_level_values(1).unique()])
     returns = get_stock_returns(stocks, s, e, freq)

@@ -50,22 +50,25 @@ def get_stock_industry(codes):
         return csf.get_stock_industry(codes, field=fields)
 
 
-def get_benchmark_return(bench_code, dt_index):
+def get_benchmark_return(bench_code, start_date, end_date, dt_index):
     """
     BenchMark收益率
-    :param bench_code: str, benchMark代码，如'000300'
-    :param dt_index:
-    :return:
+
+    Args:
+        bench_code (str): benchMark代码，如'000300'
+        start_date (str): 开始日期
+        end_date (str): 结束日期
+        dt_index (list): a list of str, 月末/周末/季末 dt
+    Returns:
+        DataFrame
     """
-    st = dt_index[0]
-    et = dt_index[-1]
     field = ['close']
     df = csf.get_index_hist_bar(
-        index_code=bench_code, start_date=st, end_date=et, field=field)
-    price = df[field].ix[dt_index, :].rename(columns={'close': 'benchmark_returns'})
-    if type(price.index[0]) not in (str, unicode):
-        price.index = price.index.map(lambda dt: str(dt.date()))
-        price.index.name = 'date'
+        index_code=bench_code, start_date=start_date, end_date=end_date, field=field)
+    if isinstance(df.index[0], pd.Timestamp):
+        df.index = df.index.map(lambda dt: str(dt.date()))
+        df.index.name = 'date'
+    price = df[field].ix[dt_index, :].rename(columns={'close': 'benchmark_returns'}).sort_index()
     ret = price.pct_change().shift(-1).dropna()
     return ret
 
@@ -182,10 +185,11 @@ def get_stock_returns(stocks, start_date, end_date, freq):
     close_price = close_price.groupby(group_key[freq]).tail(1)
     returns = close_price.pct_change().shift(-1).dropna(axis=1, how='all')
     returns.index = returns.index.map(lambda dt: str(dt.date()))
-    returns.index.name = 'dt'
+    returns.index.name = 'date'
     returns = returns.unstack().to_frame()
     returns.columns = ['ret']
     returns = returns.swaplevel(0, 1).sort_index()
+    returns.index.names = ['date', 'code']
     return returns
 
 
