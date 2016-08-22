@@ -63,8 +63,9 @@ def get_benchmark_return(bench_code, dt_index):
     df = csf.get_index_hist_bar(
         index_code=bench_code, start_date=st, end_date=et, field=field)
     price = df[field].ix[dt_index, :].rename(columns={'close': 'benchmark_returns'})
-    price.index = price.index.map(lambda dt: str(dt.date()))
-    price.index.name = 'date'
+    if type(price.index[0]) not in (str, unicode):
+        price.index = price.index.map(lambda dt: str(dt.date()))
+        price.index.name = 'date'
     ret = price.pct_change().shift(-1).dropna()
     return ret
 
@@ -185,7 +186,6 @@ def get_stock_returns(stocks, start_date, end_date, freq):
     returns = returns.unstack().to_frame()
     returns.columns = ['ret']
     returns = returns.swaplevel(0, 1).sort_index()
-    returns.index.names = stocks.index.names
     return returns
 
 
