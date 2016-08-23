@@ -8,7 +8,7 @@ factors平台是一个开源的多因子量化平台. 包含单因子分析,多�
 ## 特色:
 1. 容易使用: 本项目将多因子分析抽象成一个管道(pipeline).原始数据通过这些管道, 最终生成
 多因子分析的报告.
-![data pipeline](./multi-factor-analysis.svg)
+![data pipeline](./multi-factor-analysis.png)
 
 
 ## 安装
