@@ -62,6 +62,7 @@ data = prepare_data(factor_name=["M004009Y", 'M008005'],
                     end_date='2016-01-01', freq='M')
 
 # 定义分析流程
+# 去除st股票>>去除停牌股票>>去除最近ipo的股票>>去极值>>标准化>>打分>>分组>>分析
 pipeline = [filter_out_st, filter_out_suspend, filter_out_recently_ipo,de_extreme, standardize,
             score,
             add_group,
