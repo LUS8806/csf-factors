@@ -1,12 +1,14 @@
 # coding: utf8
 import pandas as pd
+import numpy as np
 
 from factors.analysis import add_group
 from factors.data_type import FactorData
 from factors.metrics import information_coefficient
+from factors.util import __frame_to_rank,form_fenceng,fenceng_score,drop_middle
 
 
-def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='first', na_option='keep',
+def score(fac_ret_data, method='equal_weighted', direction=False, rank_method='first', na_option='keep',
           score_window=12,
           num_group=5, group_ascending=False):
     """
@@ -21,7 +23,8 @@ def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='f
                     * ret_weighted: 收益率加权, 取第一个分组的平均收益率为该因子收益率.
                     * ret_icir_weighted: 因子icir加权
 
-        ascending (bool or dict): 默认排序, 可以是一个bool值, 所有因子相同排序, 也可以是一个字典,其key是因子名称, value是bool值.
+        direction (bool or dict): direction 表示因子方向, False:代表因子值降序(因子值越大得分越高),True:代表因子值升序(因子值越小得分越高)
+                                 默认排序, 可以是一个bool值, 所有因子相同排序, 也可以是一个字典,其key是因子名称, value是bool值.
         rank_method (str) : {'average', 'min', 'max', 'first', 'dense'}
                             * average: average rank of group
                             * min: lowest rank in group
@@ -62,24 +65,23 @@ def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='f
 
     def get_rank():
         """
-        取得因子排名. 规则如下: ascending 默认为False, 也就是值越大其rank越小(与成绩类似).会被分入靠前的组.
-        对于那些需要升序排列的因子, 我们将其乘以-1后, 统一用降序.
+        取得因子排名. 规则如下: direction 默认为False, 也就是值越大越好,得分越高,会被分入靠前的组.
         对于NA的处理,是放到最后,强制使其rank为0
         Args:
 
         Returns:
             DataFrame: 因子rank
         """
-        if isinstance(ascending, bool):
-            rnk = fac_ret_data[factor_names].groupby(level=0).rank(ascending=ascending, na_option=na_option,
+        if isinstance(direction, bool):
+            rnk = fac_ret_data[factor_names].groupby(level=0).rank(ascending=not direction, na_option=na_option,
                                                                    method=rank_method)
-        elif isinstance(ascending, dict):
-            default_ascending = dict(
+        elif isinstance(direction, dict):
+            default_direction = dict(
                 zip(factor_names, [False] * len(factor_names)))
-            if len(ascending) != len(factor_names):
-                print('ascending 长度与因子数目不同, 未指明的将按照默认降序排序(大值排名靠前).')
-            default_ascending.update(ascending)
-            rnk_list = [fac_ret_data[col].groupby(level=0).rank(asending=default_ascending[col], na_option=na_option,
+            if len(direction) != len(factor_names):
+                print('direction 长度与因子数目不同, 未指明的将按照默认降序排序(大值排名靠前).')
+            default_direction.update(direction)
+            rnk_list = [fac_ret_data[col].groupby(level=0).rank(ascending=not default_direction[col], na_option=na_option,
                                                                 method=rank_method)
                         for col in factor_names]
             rnk = pd.concat(rnk_list, axis=1)
@@ -88,6 +90,50 @@ def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='f
         # fillna后, NA的rank被置为0.
         rnk = rnk.fillna(0.0)
         return rnk
+
+    def context_weighted():
+        """
+        因子打分:市值情景加权(由于市值因子分层显著,此处默认以市值因子为分层因子)
+        1.
+        2.
+        3.
+        """
+        if isinstance(direction, bool):
+            default_direction = dict(
+                zip(factor_names, [False] * len(factor_names)))
+        elif isinstance(direction, dict):
+            default_direction = dict(
+                zip(factor_names, [False] * len(factor_names)))
+            if len(direction) != len(factor_names):
+                print('direction 长度与因子数目不同, 未指明的将按照默认降序排序(大值排名靠前).')
+            default_direction.update(direction)
+        factors=factor_names + ['cap']
+        # 1. 原始因子值和市值数据
+        fac_ret_cap=fac_ret_data[factors]
+        # 2. 根据因子方向调整因子值
+        fac_ret_cap = __frame_to_rank(default_direction, fac_ret_cap)
+        fac_ret_cap1 = fac_ret_cap[factor_names]
+        # 3. 根据ic计算各情景因子权重矩阵
+        df_fenceng = form_fenceng('M004023', factor_names)
+        # 4. 对于每个dt  各分层因子上的暴露值进行打分
+        fac_ret_cap2 = fac_ret_cap['cap']
+        df3 = fenceng_score(fac_ret_cap2)
+        df_two = map(lambda a: a[0].dot(a[1].values), zip(
+            dict(list(fac_ret_cap1.groupby(level=0))).values(),
+            dict(list(df_fenceng.groupby(level=0))).values())
+                     )
+        df_two2 = pd.concat(df_two).sort_index(level=0)
+
+        df_three = map(lambda a: a[0].dot(a[1].loc[:, list(a[0].index.get_level_values(level=1))].values), zip(
+            dict(list(df_two2.groupby(level=0))).values(),
+            dict(list(df3.groupby(level=0))).values())
+                       )
+        for i in range(len(df_three)):
+            df_three[i]['score'] = np.diag(df_three[i].values)
+        score = pd.concat([df_three[i]['score'] for i in range(len(df_three))])
+        score_ = pd.DataFrame(score).sort_index()
+        # return score_.join(fac_ret_data[other_names])
+        return score_.join(fac_ret_data[other_names])
 
     def equal_weighted():
         """
@@ -150,7 +196,8 @@ def score(fac_ret_data, method='equal_weighted', ascending=False, rank_method='f
     valid_method = {'equal_weighted': equal_weighted,
                     'ic_weighted': ic_weighted,
                     'icir_weighted': icir_weighted,
-                    'ret_weighted': ret_weighted}
+                    'ret_weighted': ret_weighted,
+                    'context_weighted':context_weighted}
     try:
         return valid_method[method]()
     except KeyError:

@@ -95,7 +95,7 @@ def add_group(fac_ret, num_group=5, ascending=True, method='first', na_option='k
         rnk = rnk.fillna(0.0)
 
         labels = ['Q{:0>2}'.format(i) for i in range(1, num_group + 1)]
-        category = pd.cut(rnk, bins=num_group, labels=labels).astype(str)
+        category = pd.cut(-rnk, bins=num_group, labels=labels).astype(str)
         category.name = 'group'
         new_frame = frame.join(category)
         return new_frame
