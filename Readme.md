@@ -3,7 +3,7 @@
 
 csf-factors主要用来进行多因子模型的创建与分析，实现了数库科技Factors（http://factors.ichinascope.com）量化平台的因子分析及多因子策略回测的功能。所运用的数据来自数库量化SDK（http://developer.ichinascope.com/docs/base/pythonsdk)。
 
-## 特色
+### 特色
 1. 容易使用: 本项目将多因子分析抽象成一个管道(pipeline).原始数据通过这些管道, 最终生成
 多因子分析的报告.
 ![data pipeline](./multi-factor-analysis.svg)
@@ -49,8 +49,8 @@ from factors.analysis import prepare_data, add_group, de_extreme
 from factors.multiple_factor_analysis import score, multiple_factors_analysis
 import csf
 
-a_key = ''
-s_key = ''
+a_key = '此处为AccessKey'
+s_key = '此处为SecretKey'
 csf.config.set_token(a_key,s_key) 
 
 # 准备数据
