@@ -6,7 +6,8 @@ csf-factors主要用来进行多因子模型的创建与分析，实现了数库
 ### 特色
 1. 容易使用: 本项目将多因子分析抽象成一个管道(pipeline).原始数据通过这些管道, 最终生成
 多因子分析的报告.
-![data pipeline](./multi-factor-analysis.svg)
+
+![data pipeline](./multi-factor-analysis.png)
 
 
 ### 安装
