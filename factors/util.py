@@ -221,7 +221,6 @@ def __frame_to_rank(direction, standardized_factor):
     for k, v in direction.iteritems():
         new_value = -1 if v else 1
         asc[k] = new_value
-    # *(-1) if ascending=True
     for col in standardized_factor_copy.columns:
         if col not in ['cap']:
             standardized_factor_copy[col]=standardized_factor[col]*asc[col]
@@ -239,14 +238,14 @@ def form_fenceng(fenceng, fac_codes):
     df = df.set_index(['dt', 'Unnamed: 0']).sort_index()
     ret=df.sort_index(level=0)
     ret = ret.groupby(level=0).apply(lambda x: x.reset_index(level=0, drop=True).T)
-    #############     #############    #############    #############    #############    计算IC_IR,并根据icir进行加权
+    # 计算IC_IR,并根据icir进行加权
     ic=ret.swaplevel(0, 1).sort_index()
     ir={}
     for ix in fac_codes:
         ir[ix]=ic.xs(ix).rolling(12,min_periods=1).mean()/ic.xs(ix).rolling(12,min_periods=1).std()
     ret=pd.Panel(ir).to_frame(filter_observations=False)
     ret = ret.groupby(level=0).apply(lambda x: x.reset_index(level=0, drop=True).T)
-    ##    #############    #############    #############    #############    #############    ############# end
+
     ret = ret.abs().fillna(0)  # na用o填充，全部变为绝对值
     ret=ret.groupby(level=0).apply(lambda x: x / x.sum())  # 计算百分比
     ret=ret.fillna(0.0)
@@ -265,12 +264,11 @@ def drop_middle(df):
         x.loc[:, high] =pd.cut(x.loc[:, 'cap'], bins=9, labels=[1, 2, 3, 4, 5, 6, 7, 8, 9]).values
         x.loc[:, low] = pd.cut(x.loc[:, 'cap'], bins=9, labels=[-9, -8, -7, -6, -5, -4, -3, -2, -1]).values
     x=x.drop('cap',1)
-    # x=x.applymap(lambda y: abs(y) if isinstance(y,int) else 0.0)
     return x.abs()
 
 def fenceng_score(df):
     '''
-    df3:对于不同个股，按照披露值进行打分，并得到个股情景权重
+    对于不同个股，按照披露值进行打分，并得到个股情景权重
     '''
     if not isinstance(df,pd.DataFrame):
         df=pd.DataFrame(df)

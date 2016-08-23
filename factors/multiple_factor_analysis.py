@@ -94,9 +94,9 @@ def score(fac_ret_data, method='equal_weighted', direction=False, rank_method='f
     def context_weighted():
         """
         因子打分:市值情景加权(由于市值因子分层显著,此处默认以市值因子为分层因子)
-        1.
-        2.
-        3.
+        1. 根据因子方向调整因子值
+        2. 根据ic计算各情景因子权重矩阵..
+        3. 对于不同个股，按照披露值进行打分，并得到个股情景权重
         """
         if isinstance(direction, bool):
             default_direction = dict(
@@ -112,27 +112,28 @@ def score(fac_ret_data, method='equal_weighted', direction=False, rank_method='f
         fac_ret_cap=fac_ret_data[factors]
         # 2. 根据因子方向调整因子值
         fac_ret_cap = __frame_to_rank(default_direction, fac_ret_cap)
-        fac_ret_cap1 = fac_ret_cap[factor_names]
+        df1 = fac_ret_cap[factor_names]
         # 3. 根据ic计算各情景因子权重矩阵
-        df_fenceng = form_fenceng('M004023', factor_names)
+        df2 = form_fenceng('M004023', factor_names)
         # 4. 对于每个dt  各分层因子上的暴露值进行打分
         fac_ret_cap2 = fac_ret_cap['cap']
         df3 = fenceng_score(fac_ret_cap2)
+        # 计算df1和df2 乘积
         df_two = map(lambda a: a[0].dot(a[1].values), zip(
-            dict(list(fac_ret_cap1.groupby(level=0))).values(),
-            dict(list(df_fenceng.groupby(level=0))).values())
+            dict(list(df1.groupby(level=0))).values(),
+            dict(list(df2.groupby(level=0))).values())
                      )
         df_two2 = pd.concat(df_two).sort_index(level=0)
-
+        # 计算df1 df2 df3 乘积
         df_three = map(lambda a: a[0].dot(a[1].loc[:, list(a[0].index.get_level_values(level=1))].values), zip(
             dict(list(df_two2.groupby(level=0))).values(),
             dict(list(df3.groupby(level=0))).values())
                        )
+        # 取对角线值
         for i in range(len(df_three)):
             df_three[i]['score'] = np.diag(df_three[i].values)
         score = pd.concat([df_three[i]['score'] for i in range(len(df_three))])
         score_ = pd.DataFrame(score).sort_index()
-        # return score_.join(fac_ret_data[other_names])
         return score_.join(fac_ret_data[other_names])
 
     def equal_weighted():
