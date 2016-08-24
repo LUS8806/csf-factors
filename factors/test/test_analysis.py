@@ -23,11 +23,13 @@ def test_multiple_factors_analysis():
                 (information_coefficient_analysis, return_analysis, code_analysis, turnover_analysis)]
     params = {'de_extreme': {'num': 1, 'method': 'mad'},
               'standardize': dict(method='cap'),
+              'score': {'method': 'context_weighted'},
               'return_analysis': dict(plot=True),
               }
     result = multiple_factors_analysis(data, pipeline, params)
 
     print('done')
+
 
 if __name__ == '__main__':
     test_multiple_factors_analysis()

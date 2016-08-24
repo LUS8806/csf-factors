@@ -210,3 +210,73 @@ def window(seq, n=2, longest=False):
     for elem in it:
         result = result[1:] + (elem,)
         yield result
+
+def __frame_to_rank(direction, standardized_factor):
+    '''
+    根据因子方向调整正负。
+    '''
+    standardized_factor_copy = standardized_factor.copy()
+    # transfer True to -1, False to 1
+    asc = {}
+    for k, v in direction.iteritems():
+        new_value = -1 if v else 1
+        asc[k] = new_value
+    for col in standardized_factor_copy.columns:
+        if col not in ['cap']:
+            standardized_factor_copy[col]=standardized_factor[col]*asc[col]
+    return standardized_factor_copy
+
+def form_fenceng(fenceng, fac_codes):
+    '''
+    根据ic计算各情景因子权重矩阵..
+    '''
+    df = pd.read_csv('/media/jessica/00001D050000386C/SUNJINGJING/dev/csf-factors/factors/stats_M004023.csv')
+    lst = list(set(fac_codes)|set(['dt', 'Unnamed: 0']))
+    df = df[df['Unnamed: 0'] != 'all']
+    df = df[lst]
+    df['Unnamed: 0']=df['Unnamed: 0'].map(lambda x:('{}_{}').format('cap',x))
+    df = df.set_index(['dt', 'Unnamed: 0']).sort_index()
+    ret=df.sort_index(level=0)
+    ret = ret.groupby(level=0).apply(lambda x: x.reset_index(level=0, drop=True).T)
+    # 计算IC_IR,并根据icir进行加权
+    ic=ret.swaplevel(0, 1).sort_index()
+    ir={}
+    for ix in fac_codes:
+        ir[ix]=ic.xs(ix).rolling(12,min_periods=1).mean()/ic.xs(ix).rolling(12,min_periods=1).std()
+    ret=pd.Panel(ir).to_frame(filter_observations=False)
+    ret = ret.groupby(level=0).apply(lambda x: x.reset_index(level=0, drop=True).T)
+
+    ret = ret.abs().fillna(0)  # na用o填充，全部变为绝对值
+    ret=ret.groupby(level=0).apply(lambda x: x / x.sum())  # 计算百分比
+    ret=ret.fillna(0.0)
+    return ret
+
+def drop_middle(df):
+    import numpy as np
+    x=df.rank(method='average', na_option='keep')
+    l=len(x)
+    high=('{}_high').format('cap')
+    low = ('{}_low').format('cap')
+    if x.loc[:, 'cap'].notnull().sum()==0:
+        x.loc[:, high]=np.nan
+        x.loc[:, low]=np.nan
+    else:
+        x.loc[:, high] =pd.cut(x.loc[:, 'cap'], bins=9, labels=[1, 2, 3, 4, 5, 6, 7, 8, 9]).values
+        x.loc[:, low] = pd.cut(x.loc[:, 'cap'], bins=9, labels=[-9, -8, -7, -6, -5, -4, -3, -2, -1]).values
+    x=x.drop('cap',1)
+    return x.abs()
+
+def fenceng_score(df):
+    '''
+    对于不同个股，按照披露值进行打分，并得到个股情景权重
+    '''
+    if not isinstance(df,pd.DataFrame):
+        df=pd.DataFrame(df)
+    ret = df.groupby(level=0).rank(method='average', na_option='keep')
+    __drop_middle = lambda x: drop_middle(x)
+    ret2 = ret.groupby(level=0).apply(__drop_middle).sort_index()
+    ret2=ret2.fillna(0.0)
+    df3=ret2.groupby(level=0).apply(lambda x:x.reset_index(level=0, drop=True).T)
+    df3 = df3.sort_index().groupby(level=0).apply(lambda x: x / x.sum())  # 计算百分比
+    return df3
+
